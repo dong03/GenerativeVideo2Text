@@ -654,13 +654,13 @@ class SmoothLabelCrossEntropyLoss(nn.Module):
                 prob = torch.nn.functional.softmax(feature.detach(), dim=1)
                 num = feature.size(0)
                 avg_prob = prob[torch.arange(num), target].mean()
-                logging.info('{}: iter={}, avg pos = {}, max loss = {}, min loss = {}'.format(
-                    self.log_prefix,
-                    self.iter,
-                    avg_prob,
-                    self.max_loss,
-                    self.min_loss,
-                ))
+                # logging.info('{}: iter={}, avg pos = {}, max loss = {}, min loss = {}'.format(
+                #     self.log_prefix,
+                #     self.iter,
+                #     avg_prob,
+                #     self.max_loss,
+                #     self.min_loss,
+                # ))
                 self.max_loss = 0
                 self.min_loss = 10000000
         loss = self.kl(log_prb, one_hot)
@@ -959,7 +959,8 @@ class CaptioningModel(nn.Module):
             feat = feat[valid_mask]
             loss = self.loss(feat, target)
             if (self.verbose['num_has_image'] + self.verbose['num_no_image']) % 200 == 0:
-                logging.info(self.verbose)
+                pass
+                # logging.info(self.verbose)
             hint = 'l' if 'context_target_type' not in batch else batch['context_target_type'][0]
             if has_image:
                 output_dict.update({'vl_{}_loss'.format(hint): loss})

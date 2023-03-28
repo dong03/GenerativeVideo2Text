@@ -50,7 +50,10 @@ class ImageTransform2Dict(object):
 
     def __call__(self, dict_data):
         out = dict(dict_data.items())
-        out[self.key] = self.image_transform(dict_data[self.key])
+        if isinstance(dict_data[self.key], list):
+            out[self.key] = [self.image_transform(each) for each in dict_data[self.key]]
+        else:
+            out[self.key] = self.image_transform(dict_data[self.key])
         return out
 
     def __repr__(self):
