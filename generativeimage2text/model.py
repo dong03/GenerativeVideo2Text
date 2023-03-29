@@ -13,7 +13,7 @@ def get_git_model(tokenizer, param):
     )
     text_decoder = TransformerDecoderTextualHead(
         visual_feature_size=param.get('visual_feature_size', 768),
-        vocab_size=30522,
+        vocab_size=tokenizer.vocab_size,
         hidden_size=768,
         num_layers=6,
         attention_heads=12,

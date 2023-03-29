@@ -8,6 +8,7 @@ from .torch_common import recursive_to_device
 from .tsv_io import TSVFile, tsv_writer, tsv_reader
 from .common import write_to_file
 import torch
+from .torch_common import torch_load
 import PIL
 import numpy as np
 from pprint import pformat
@@ -38,18 +39,15 @@ from .model import get_git_model
 
 def get_data(image_file, prefix, target, tokenizer, image_transform):
     max_text_len = 40
-    prefix_encoding = tokenizer(prefix,
-                                padding='do_not_pad',
-                                add_special_tokens=False,
-                                truncation=True,
-                                max_length=max_text_len)
-    target_encoding = tokenizer(target,
-                                padding=True,
-                                add_special_tokens=False,
-                                truncation=True,
-                                max_length=max_text_len)
-    need_predict = [0] * len(prefix_encoding['input_ids']) + [1] * len(
-        target_encoding['input_ids'])
+    prefix_encoding = tokenizer(
+        prefix, padding='do_not_pad',
+        add_special_tokens=False,
+        truncation=True, max_length=max_text_len)
+    target_encoding = tokenizer(
+        target, padding='do_not_pad',
+        add_special_tokens=False,
+        truncation=True, max_length=max_text_len)
+    need_predict = [0] * len(prefix_encoding['input_ids']) + [1] * len(target_encoding['input_ids'])
     payload = prefix_encoding['input_ids'] + target_encoding['input_ids']
     if len(payload) > max_text_len:
         payload = payload[-(max_text_len - 2):]
@@ -78,35 +76,30 @@ def get_data(image_file, prefix, target, tokenizer, image_transform):
 
     return data
 
-
 def get_image_transform(cfg):
     return get_multi_scale_image_transform(cfg, is_train=True)
-
 
 def get_default_mean():
     return [0.485, 0.456, 0.406]
 
-
 def get_default_std():
     return [0.229, 0.224, 0.225]
 
-
 def get_transform_image_norm(cfg, default=None):
     if cfg.data_normalize == 'default':
-        normalize = transforms.Normalize(mean=get_default_mean(),
-                                         std=get_default_std())
+        normalize = transforms.Normalize(
+            mean=get_default_mean(), std=get_default_std())
     elif cfg.data_normalize == 'clip':
         # clip model
-        normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073),
-                                         (0.26862954, 0.26130258, 0.27577711))
+        normalize = transforms.Normalize(
+            (0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
     else:
         raise NotImplementedError(cfg.data_normalize)
     return normalize
 
-
 def get_transform_vit_default(cfg, is_train):
-    default_normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                             std=[0.5, 0.5, 0.5])
+    default_normalize = transforms.Normalize(
+            mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     normalize = get_transform_image_norm(cfg, default_normalize)
     transform = get_inception_train_transform(
         bgr2rgb=True,
@@ -122,18 +115,16 @@ def get_transform_vit_default(cfg, is_train):
     )
     return transform
 
-
 def get_transform_image(cfg, is_train):
     train_transform = cfg.train_transform
     if train_transform == 'vitp':
-        transform = get_transform_vit_default(cfg, is_train=is_train)
+        transform = get_transform_vit_default(
+            cfg, is_train=is_train)
     else:
         raise NotImplementedError(train_transform)
     return transform
 
-
 class ImageTransform2Images(object):
-
     def __init__(self, sep_transform, first_joint=None):
         self.image_transform = sep_transform
         self.first_joint = first_joint
@@ -145,18 +136,16 @@ class ImageTransform2Images(object):
 
     def __repr__(self):
         return 'ImageTransform2Images(image_transform={})'.format(
-            self.image_transform, )
-
+            self.image_transform,
+        )
 
 def get_transform_images(cfg, is_train):
     trans = get_transform_image(cfg, is_train)
     trans = ImageTransform2Images(trans)
     return trans
 
-
 def trans_select_for_crop_size(
-    data,
-    train_crop_sizes,
+    data, train_crop_sizes,
     iteration_multi=0,
 ):
     if iteration_multi <= 0:
@@ -170,11 +159,7 @@ def trans_select_for_crop_size(
         idx = -1
     return idx
 
-
-def get_multi_scale_image_transform(cfg,
-                                    is_train,
-                                    get_one=get_transform_image):
-
+def get_multi_scale_image_transform(cfg, is_train, get_one=get_transform_image):
     def get_multi_res_transform(s):
         old = cfg.train_crop_size if is_train else cfg.test_crop_size
         all_t = []
@@ -207,12 +192,10 @@ def get_multi_scale_image_transform(cfg,
         if cfg.min_size_range32 is None:
             train_crop_sizes = [cfg.train_crop_size]
         else:
-            train_crop_sizes = list(
-                range(
-                    cfg.min_size_range32[0],
-                    cfg.min_size_range32[1] + cfg.patch_size - 1,
-                    cfg.patch_size,
-                ))
+            train_crop_sizes = list(range(
+                cfg.min_size_range32[0],
+                cfg.min_size_range32[1] + cfg.patch_size - 1, cfg.patch_size,
+            ))
     else:
         train_crop_sizes = [cfg.test_crop_size]
 
@@ -222,10 +205,10 @@ def get_multi_scale_image_transform(cfg,
         crop_trans.append(t)
     iteration_multi = 0
     image_transform = SelectTransform(
-        crop_trans, lambda d: trans_select_for_crop_size(
+        crop_trans,
+        lambda d: trans_select_for_crop_size(
             d, train_crop_sizes, iteration_multi))
     return image_transform
-
 
 def forward_backward_example(image_files, captions, prefixs=None):
     if prefixs is None:
@@ -239,19 +222,17 @@ def forward_backward_example(image_files, captions, prefixs=None):
         'no_flip': True,
         'no_aspect_dist': True,
         'interpolation': 'bicubic',
-        'min_size_range32': [
-            160, 224
-        ],  # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
+        'min_size_range32': [160, 224], # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
         'patch_size': 16,
         'train_transform': 'vitp',
     }
     cfg = Config(cfg, {})
     all_data = []
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',
-                                              do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
     image_transform = get_image_transform(cfg)
     for image_file, prefix, target in zip(image_files, prefixs, captions):
-        data = get_data(image_file, prefix, target, tokenizer, image_transform)
+        data = get_data(image_file, prefix, target,
+                        tokenizer, image_transform)
         all_data.append(data)
     data = collate_fn(all_data)
     logging.info(image_transform)
@@ -280,7 +261,7 @@ def dcb_train():
     STOP_EPOCH = 5
     FAIL_EPOCH = 0
     BZ = 4
-    INIT_LR = 1.0e-3
+    INIT_LR = 1.0e-5
     print_freq = 50
     # ==================dataset==================
     root = '/data/dcb/bv/FrameWithTextData'
@@ -325,14 +306,18 @@ def dcb_train():
     }
     cfg = Config(cfg, {})
     param = {}
-
+    if File.isfile(f'aux_data/models/{model_name}/parameter.yaml'):
+        param = load_from_yaml_file(
+                f'aux_data/models/{model_name}/parameter.yaml')
+    model_name = 'GIT_BASE_VATEX'
     tokenizer = ChineseCLIPProcessor.from_pretrained(
         "OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = tokenizer.tokenizer
     image_transform = get_image_transform(cfg)
     model = get_git_model(tokenizer, param)
-    # ckpt = torch.load('ckpt/GIT_BV_epoch-1.pth', map_location='cpu')
-    # model.load_state_dict(ckpt)
+    pretrained = f'output/{model_name}/snapshot/model.pt'
+    checkpoint = torch_load(pretrained)['model']
+    load_state_dict(model, checkpoint)
     model.cuda()
     scaler = GradScaler()
     optimizer = torch.optim.AdamW(model.parameters(), lr=INIT_LR)
@@ -384,7 +369,7 @@ def dcb_train():
                 print(select_data)
             # scaler, optimizer, logger
         scheduler.step()
-        torch.save(model.state_dict(), f'./ckpt/GIT_BV_epoch{epoch}.pth')
+        torch.save(model.state_dict(), f'/data4/dcb/records/git/ckpt/GIT_DCB_epoch{epoch}.pth')
         # '''
         # val
         model.eval()
@@ -473,12 +458,8 @@ def dcb_train():
         '''
 def speed_test_forward_backward():
     duplicate = 32
-    image_files = ['aux_data/images/1.jpg', 'aux_data/images/2.jpg'
-                   ] * duplicate
-    captions = [
-        'a couple of boats in a large body of water.',
-        'a view of a mountain with a tree'
-    ] * duplicate
+    image_files = ['aux_data/images/1.jpg', 'aux_data/images/2.jpg'] * duplicate
+    captions = ['a couple of boats in a large body of water.', 'a view of a mountain with a tree'] * duplicate
 
     prefixs = [''] * len(captions)
     cfg = {
@@ -490,18 +471,14 @@ def speed_test_forward_backward():
         'no_flip': True,
         'no_aspect_dist': True,
         'interpolation': 'bicubic',
-        'min_size_range32': [
-            160, 224
-        ],  # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
+        'min_size_range32': [160, 224], # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
         'patch_size': 16,
         'train_transform': 'vitp',
     }
     cfg = Config(cfg, {})
     all_data = []
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',
-                                              do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
     image_transform = get_image_transform(cfg)
-
     for image_file, prefix, target in zip(image_files, prefixs, captions):
         data = get_data([image_file, image_file, image_file, image_file],
                         prefix, target, tokenizer, image_transform)
@@ -511,7 +488,6 @@ def speed_test_forward_backward():
     logging.info(image_transform)
     data = recursive_to_device(data, 'cuda')
     data['image'] = data['image'].to(torch.float16)
-    # data['image'] = [data['image'] for _ in range(4)]
     param = {}
     model = get_git_model(tokenizer, param)
     model.train()
@@ -549,3 +525,4 @@ if __name__ == '__main__':
     function_name = kwargs['type']
     del kwargs['type']
     locals()[function_name](**kwargs)
+

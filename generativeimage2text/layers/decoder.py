@@ -181,6 +181,7 @@ def create_decoder(decoder_type, norm_type,
                    num_layers,
                    output_hidden_states=False,
                    use_mlp_wrapper=None,
+                   vocab_size=30522
                    ):
     assert norm_type in ['post', 'pre']
     if decoder_type is None:
@@ -189,7 +190,7 @@ def create_decoder(decoder_type, norm_type,
         from .bert import BertConfig
         from .bert.modeling_bert import BertEncoder
         config = BertConfig(
-            vocab_size_or_config_json_file=30522,
+            vocab_size_or_config_json_file=vocab_size,
             hidden_size=textual_feature_size,
             num_hidden_layers=num_layers,
             num_attention_heads=attention_heads,
@@ -492,6 +493,7 @@ class TransformerDecoderTextualHead(TextualHead):
             num_layers=self.num_layers,
             output_hidden_states=output_hidden_states,
             use_mlp_wrapper=use_mlp_wrapper,
+            vocab_size=vocab_size,
         )
         self.apply(self._init_weights)
 

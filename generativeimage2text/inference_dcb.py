@@ -245,7 +245,7 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id):
     videos = open('/home/dcb/code/bv/captioning/cmo/BV_0321_videopath.txt',
                   encoding='utf-8').readlines()
     videos = [each.strip().split('\t')[0] for each in videos]
-    with open(f'{model_name}_com.txt', 'w') as f:
+    with open(f'{nabu}_com.txt', 'w') as f:
         for ix, bv in enumerate(tqdm(videos)):
             try:
                 # import pdb; pdb.set_trace()
