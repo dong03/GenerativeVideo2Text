@@ -11,10 +11,11 @@ def recursive_to_device(d, device, **kwargs):
     elif isinstance(d, dict):
         return dict((k, recursive_to_device(v, device)) for k, v in d.items())
     elif isinstance(d, torch.Tensor) or hasattr(d, 'to'):
-        #return d.to(device, non_blocking=True)
+        # return d.to(device, non_blocking=True)
         return d.to(device, **kwargs)
     else:
         return d
+
 
 def resize_2d_pos_embed(origin_pos_embed, origin_input, patch_size, after_input):
     origin_dim2 = False
@@ -28,15 +29,20 @@ def resize_2d_pos_embed(origin_pos_embed, origin_input, patch_size, after_input)
     embed_dim = origin_pos_embed.shape[-1]
     assert origin_pos_embed.shape[1] == grid_before * grid_before + 1
 
-    pos_embed = origin_pos_embed[0, 1:, :].reshape((grid_before, grid_before, embed_dim))
+    pos_embed = origin_pos_embed[0, 1:, :].reshape(
+        (grid_before, grid_before, embed_dim))
     new_size = (grid_after, grid_after)
-    pos_embed = torch.nn.functional.interpolate(pos_embed.permute((2, 0, 1)).unsqueeze(0), size=new_size, mode='bicubic')
-    pos_embed = pos_embed.squeeze(0).permute((1, 2, 0)).reshape((-1, embed_dim))
-    pos_embed = torch.cat((origin_pos_embed[0, 0:1, :], pos_embed), dim=0).unsqueeze(0)
+    pos_embed = torch.nn.functional.interpolate(pos_embed.permute(
+        (2, 0, 1)).unsqueeze(0), size=new_size, mode='bicubic')
+    pos_embed = pos_embed.squeeze(0).permute(
+        (1, 2, 0)).reshape((-1, embed_dim))
+    pos_embed = torch.cat(
+        (origin_pos_embed[0, 0:1, :], pos_embed), dim=0).unsqueeze(0)
     if origin_dim2:
         assert pos_embed.shape[0] == 1
         pos_embed = pos_embed.squeeze(0)
     return pos_embed
+
 
 def torch_load(filename):
     # import pdb; pdb.set_trace()
@@ -45,16 +51,19 @@ def torch_load(filename):
     result = torch.load(buf, map_location=lambda storage, loc: storage)
     return result
 
+
 def remove_prefix(model, prefix):
     out = {}
     for k, v in model.items():
         while k.startswith(prefix):
-            k = k[len(prefix): ]
+            k = k[len(prefix):]
         out[k] = v
     return out
 
+
 def strip_prefix_if_present(state_dict, prefix):
     return remove_prefix(state_dict, prefix)
+
 
 def load_model_state_ignore_mismatch(model, init_dict):
     real_init_dict = {}
@@ -63,7 +72,7 @@ def load_model_state_ignore_mismatch(model, init_dict):
 
     def same_shape(a, b):
         return len(a.shape) == len(b.shape) and \
-                all(x == y for x, y in zip(a.shape, b.shape))
+            all(x == y for x, y in zip(a.shape, b.shape))
 
     num_ignored = 0
     unique_key_in_init_dict = []
@@ -88,15 +97,18 @@ def load_model_state_ignore_mismatch(model, init_dict):
     #     pformat(result.missing_keys),
     # ))
 
-    #logging.info('loaded key = {}'.format(
-        #pformat(list(real_init_dict.keys()))))
+    # logging.info('loaded key = {}'.format(
+    # pformat(list(real_init_dict.keys()))))
+
 
 def load_state_dict(model, loaded_state_dict):
     model_state_dict = model.state_dict()
-    loaded_state_dict = strip_prefix_if_present(loaded_state_dict, prefix="module.")
+    loaded_state_dict = strip_prefix_if_present(
+        loaded_state_dict, prefix="module.")
     align_and_update_state_dicts(model_state_dict, loaded_state_dict)
 
     load_model_state_ignore_mismatch(model, model_state_dict)
+
 
 def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     current_keys = sorted(list(model_state_dict.keys()))
@@ -112,7 +124,8 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     idxs[max_match_size == 0] = -1
 
     max_size = max([len(key) for key in current_keys]) if current_keys else 1
-    max_size_loaded = max([len(key) for key in loaded_keys]) if loaded_keys else 1
+    max_size_loaded = max([len(key)
+                          for key in loaded_keys]) if loaded_keys else 1
     log_str_template = "{: <{}} will be loaded from {: <{}} of shape {}"
     target_source_name_matched = 0
     all_key_old = set()
@@ -126,22 +139,22 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
         updated_keys.append(key)
         all_key_old.add(key_old)
         target_source_name_matched += 1
-        logging.info(
-            log_str_template.format(
-                key,
-                max_size,
-                key_old,
-                max_size_loaded,
-                tuple(loaded_state_dict[key_old].shape),
-            )
-        )
-    logging.info('target model param = {}; name matched = {}; loaded = {}'.format(
-        len(model_state_dict), target_source_name_matched,
-        len(loaded_state_dict)))
+        # logging.info(
+        #     log_str_template.format(
+        #         key,
+        #         max_size,
+        #         key_old,
+        #         max_size_loaded,
+        #         tuple(loaded_state_dict[key_old].shape),
+        #     )
+        # )
+    # logging.info('target model param = {}; name matched = {}; loaded = {}'.format(
+    #     len(model_state_dict), target_source_name_matched,
+    #     len(loaded_state_dict)))
     logging.info('from loaded; ignore = {}'.format(
         pformat([k for k in loaded_state_dict if k not in all_key_old])))
     updated_keys = set(updated_keys)
-    no_update_keys = [k for k in model_state_dict.keys() if k not in updated_keys]
+    no_update_keys = [k for k in model_state_dict.keys()
+                      if k not in updated_keys]
     for k in no_update_keys:
         del model_state_dict[k]
-

@@ -10,6 +10,7 @@ from .common import write_to_file
 import torch
 from .torch_common import torch_load
 import PIL
+import os
 import numpy as np
 from pprint import pformat
 import logging
@@ -35,6 +36,13 @@ from .data_layer.transform import ImageTransform2Dict
 from .data_layer.transform import get_inception_train_transform
 from .data_layer.builder import collate_fn
 from .model import get_git_model
+import os
+import random
+from torch.cuda.amp import autocast, GradScaler
+from transformers import ChineseCLIPProcessor
+from .common import Progbar
+from tqdm import tqdm
+import warnings
 
 
 def get_data(image_file, prefix, target, tokenizer, image_transform):
@@ -47,7 +55,9 @@ def get_data(image_file, prefix, target, tokenizer, image_transform):
         target, padding='do_not_pad',
         add_special_tokens=False,
         truncation=True, max_length=max_text_len)
-    need_predict = [0] * len(prefix_encoding['input_ids']) + [1] * len(target_encoding['input_ids'])
+    import pdb; pdb.set_trace()
+    need_predict = [0] * len(prefix_encoding['input_ids']) + \
+        [1] * len(target_encoding['input_ids'])
     payload = prefix_encoding['input_ids'] + target_encoding['input_ids']
     if len(payload) > max_text_len:
         payload = payload[-(max_text_len - 2):]
@@ -61,7 +71,7 @@ def get_data(image_file, prefix, target, tokenizer, image_transform):
 
     data = {
         'caption_tokens': torch.tensor(input_ids),
-        #'caption_lengths': len(input_ids),
+        # 'caption_lengths': len(input_ids),
         'need_predict': torch.tensor(need_predict),
         'image': im,
         # 'rect' field can be fed in 'caption', which tells the bounding box
@@ -76,14 +86,18 @@ def get_data(image_file, prefix, target, tokenizer, image_transform):
 
     return data
 
+
 def get_image_transform(cfg):
     return get_multi_scale_image_transform(cfg, is_train=True)
+
 
 def get_default_mean():
     return [0.485, 0.456, 0.406]
 
+
 def get_default_std():
     return [0.229, 0.224, 0.225]
+
 
 def get_transform_image_norm(cfg, default=None):
     if cfg.data_normalize == 'default':
@@ -97,9 +111,10 @@ def get_transform_image_norm(cfg, default=None):
         raise NotImplementedError(cfg.data_normalize)
     return normalize
 
+
 def get_transform_vit_default(cfg, is_train):
     default_normalize = transforms.Normalize(
-            mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     normalize = get_transform_image_norm(cfg, default_normalize)
     transform = get_inception_train_transform(
         bgr2rgb=True,
@@ -115,6 +130,7 @@ def get_transform_vit_default(cfg, is_train):
     )
     return transform
 
+
 def get_transform_image(cfg, is_train):
     train_transform = cfg.train_transform
     if train_transform == 'vitp':
@@ -123,6 +139,7 @@ def get_transform_image(cfg, is_train):
     else:
         raise NotImplementedError(train_transform)
     return transform
+
 
 class ImageTransform2Images(object):
     def __init__(self, sep_transform, first_joint=None):
@@ -139,10 +156,12 @@ class ImageTransform2Images(object):
             self.image_transform,
         )
 
+
 def get_transform_images(cfg, is_train):
     trans = get_transform_image(cfg, is_train)
     trans = ImageTransform2Images(trans)
     return trans
+
 
 def trans_select_for_crop_size(
     data, train_crop_sizes,
@@ -158,6 +177,7 @@ def trans_select_for_crop_size(
     else:
         idx = -1
     return idx
+
 
 def get_multi_scale_image_transform(cfg, is_train, get_one=get_transform_image):
     def get_multi_res_transform(s):
@@ -210,6 +230,7 @@ def get_multi_scale_image_transform(cfg, is_train, get_one=get_transform_image):
             d, train_crop_sizes, iteration_multi))
     return image_transform
 
+
 def forward_backward_example(image_files, captions, prefixs=None):
     if prefixs is None:
         prefixs = [''] * len(captions)
@@ -222,13 +243,15 @@ def forward_backward_example(image_files, captions, prefixs=None):
         'no_flip': True,
         'no_aspect_dist': True,
         'interpolation': 'bicubic',
-        'min_size_range32': [160, 224], # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
+        # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
+        'min_size_range32': [160, 224],
         'patch_size': 16,
         'train_transform': 'vitp',
     }
     cfg = Config(cfg, {})
     all_data = []
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained(
+        'bert-base-uncased', do_lower_case=True)
     image_transform = get_image_transform(cfg)
     for image_file, prefix, target in zip(image_files, prefixs, captions):
         data = get_data(image_file, prefix, target,
@@ -248,45 +271,96 @@ def forward_backward_example(image_files, captions, prefixs=None):
     logging.info(loss)
 
 
-def dcb_train():
-    import os
-    import random
-    from torch.cuda.amp import autocast, GradScaler
-    from transformers import ChineseCLIPProcessor
-    from .common import Progbar
-    from tqdm import tqdm
-    import warnings
+def dcb_val(model, step, val_dataset, dataset_name, tokenizer, image_transform, description, BZ, SAM_NUM):
+    model.eval()
+    loss_score = []
+    header = 'Val step: [{}]'.format(step)
+    # cal_loss
+
+    f = open(
+        f'ckpt/val_DCB_{dataset_name}_{description}_step{step}.txt', 'w', encoding='utf-8')
+    for data_ix in tqdm(range(0, len(val_dataset), BZ)):
+        select_data = val_dataset[data_ix:data_ix + BZ]
+        input_data = []
+        for image_path, captions in select_data:
+            image_files = os.listdir(image_path)
+            image_files = sorted(
+                image_files,
+                key=lambda x: int(x.split('_')[-1].split('.')[0]))
+            image_files = [
+                os.path.join(image_path, each) for each in image_files
+            ]
+            if len(image_files) > SAM_NUM:
+                sample_ix = np.linspace(0,
+                                        len(image_files) - 1,
+                                        num=SAM_NUM,
+                                        endpoint=True,
+                                        retstep=False,
+                                        dtype=int)
+                image_files = np.array(image_files)[sample_ix].tolist()
+            data = get_data(image_files, '', captions, tokenizer,
+                            image_transform)
+            input_data.append(data)
+
+        input_data = collate_fn(input_data)
+
+        input_data = recursive_to_device(input_data, 'cuda')
+        with torch.no_grad():
+            model.training = True
+            loss_dict = model(input_data)
+            loss = sum(loss_dict.values())
+            loss_score.append(loss.item())
+
+            model.training = False
+            result = model(input_data)
+
+            for i in range(result['predictions'].shape[0]):
+                cap = tokenizer.decode(
+                    result['predictions'][0],
+                    skip_special_tokens=True)
+                f.write(f"{image_path}\t{cap}\n")
+
+        model.training = True
+    f.close()
+    score = np.mean(loss_score)
+    return score
+
+
+def get_parameter_number(model):
+    total_num = sum(p.numel() for p in model.parameters())
+    trainable_num = sum(p.numel() for p in model.parameters()
+                        if p.requires_grad)
+    print("Total: %.2fM, Trainable: %.2fM" %
+          (total_num / 1.0e6, trainable_num / 1.0e6))
+
+
+def dcb_train(yaml, description=''):
+
     warnings.filterwarnings('ignore')
+    dcb_param = load_from_yaml_file(yaml)
+
     EPOCH = 10
     STOP_EPOCH = 5
     FAIL_EPOCH = 0
-    BZ = 4
-    INIT_LR = 1.0e-5
+    BZ = 32
+    SAM_NUM = 8
+    INIT_LR = dcb_param['INIT_LR']
     print_freq = 50
+    model_name = 'GIT_BASE_VATEX'
+    dataset_name = dcb_param['dataset_name']
     # ==================dataset==================
-    root = '/data/dcb/bv/FrameWithTextData'
-    bvcaptions = open(
-        '/home/dcb/code/bv/captioning/merge_b5w_goodcaptions.txt',
-        encoding='utf-8').readlines()
-    bvcaptions = [each.strip().split('\t') for each in bvcaptions]
-    select_bv = []
-    for line in bvcaptions:
-        bv = line[0]
-        if len(os.listdir(os.path.join(root, bv))):
-            select_bv.append(line)
-    print(len(bvcaptions), len(select_bv))
-    bvcaptions = select_bv
-    train_raw_data, val_raw_data = [], []
-    import random
-    random.seed(42)
-    random.shuffle(bvcaptions)
-    for line in bvcaptions[:-500]:
-        bv, gts = line[0], line[1:]
-        train_raw_data.extend([[os.path.join(root, bv), gt] for gt in gts])
+    train_root = dcb_param['train_root']
+    train_dataset = open(dcb_param['train_file']
+                         ).readlines()
+    train_dataset = [each.strip().split('\t') for each in train_dataset]
+    train_dataset = [[os.path.join(train_root, each[0].split('#')[
+        0]), each[1]] for each in train_dataset]
 
-    for line in bvcaptions[-500:]:
-        bv, gts = line[0], line[1:]
-        val_raw_data.extend([[os.path.join(root, bv), gt] for gt in gts])
+    val_root = dcb_param['val_root']
+    val_dataset = open(dcb_param['val_file']).readlines()
+    val_dataset = [each.strip().split('\t') for each in val_dataset]
+    val_dataset = [[os.path.join(val_root, each[0].split(
+        '#')[0]), each[1]] for each in val_dataset]
 
     # ==================model==================
     cfg = {
@@ -304,17 +378,29 @@ def dcb_train():
         'patch_size': 16,
         'train_transform': 'vitp',
     }
+
     cfg = Config(cfg, {})
     param = {}
     if File.isfile(f'aux_data/models/{model_name}/parameter.yaml'):
         param = load_from_yaml_file(
-                f'aux_data/models/{model_name}/parameter.yaml')
-    model_name = 'GIT_BASE_VATEX'
+            f'aux_data/models/{model_name}/parameter.yaml')
+
     tokenizer = ChineseCLIPProcessor.from_pretrained(
         "OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = tokenizer.tokenizer
     image_transform = get_image_transform(cfg)
     model = get_git_model(tokenizer, param)
+    if dcb_param['freeze'] == 'image':
+        for n, p in model.named_parameters():
+            if 'image_encoder' in n:
+                p.requires_grad = False
+    elif dcb_param['freeze'] == 'all':
+        for n, p in model.named_parameters():
+            if 'textual.embedding' not in n and 'textual.output' not in n:
+                p.requires_grad = False
+    elif dcb_param['freeze'] == 'None':
+        pass
+    get_parameter_number(model)
     pretrained = f'output/{model_name}/snapshot/model.pt'
     checkpoint = torch_load(pretrained)['model']
     load_state_dict(model, checkpoint)
@@ -334,10 +420,10 @@ def dcb_train():
         # '''
         model.train()
         header = 'Train Epoch: [{}]'.format(epoch)
-        random.shuffle(train_raw_data)
-        progbar = Progbar(len(train_raw_data) // BZ)
-        for data_ix in range(0, len(train_raw_data), BZ):
-            select_data = train_raw_data[data_ix:data_ix + BZ]
+        random.shuffle(train_dataset)
+        progbar = Progbar(len(train_dataset) // BZ)
+        for data_ix in range(0, len(train_dataset), BZ):
+            select_data = train_dataset[data_ix:data_ix + BZ]
             input_data = []
             for image_path, captions in select_data:
                 image_files = os.listdir(image_path)
@@ -348,7 +434,18 @@ def dcb_train():
                 image_files = [
                     os.path.join(image_path, each) for each in image_files
                 ]
-
+                try:
+                    if len(image_files) != SAM_NUM:
+                        sample_ix = np.linspace(0,
+                                                len(image_files) - 1,
+                                                num=SAM_NUM,
+                                                endpoint=True,
+                                                retstep=False,
+                                                dtype=int)
+                        image_files = np.array(image_files)[sample_ix].tolist()
+                except:
+                    import pdb
+                    pdb.set_trace()
                 data = get_data(image_files, '', captions, tokenizer,
                                 image_transform)
                 input_data.append(data)
@@ -367,55 +464,31 @@ def dcb_train():
                 scaler.update()
             except:
                 print(select_data)
+
+            if data_ix and data_ix % (100 * BZ) == 0:
+                torch.save(model.state_dict(),
+                           f'./ckpt/GIT_DCB_{dataset_name}_{description}_step{epoch *(len(train_dataset) // BZ) +data_ix}.pth')
+                model.eval()
+                score = dcb_val(model, epoch * (len(train_dataset) // BZ) +
+                                data_ix, val_dataset, dataset_name, tokenizer, image_transform, description, BZ//2, SAM_NUM)
+                if score <= best_score:
+                    FAIL_EPOCH = 0
+                    best_score = score
+                    best_step = epoch * (len(train_dataset) // BZ)
+                else:
+                    FAIL_EPOCH += 1
+
+                if FAIL_EPOCH == STOP_EPOCH:
+                    print(
+                        f"Early stop at step {epoch *(len(train_dataset) // BZ)}, get best in epoch {best_step}")
+                    break
+                print(f"get score {score} \n")
+                model.train()
             # scaler, optimizer, logger
         scheduler.step()
-        torch.save(model.state_dict(), f'/data4/dcb/records/git/ckpt/GIT_DCB_epoch{epoch}.pth')
-        # '''
-        # val
-        model.eval()
-        loss_score = []
-        header = 'Val Epoch: [{}]'.format(epoch)
-        progbar = Progbar(len(val_raw_data) // BZ)
-        # cal_loss
-        model.training = True
-        for data_ix in range(0, len(val_raw_data), BZ):
-            select_data = val_raw_data[data_ix:data_ix + BZ]
-            input_data = []
-            for image_path, captions in select_data:
-                image_files = os.listdir(image_path)
-                image_files = sorted(
-                    image_files,
-                    key=lambda x: int(x.split('_')[-1].split('.')[0]))
-                image_files = [
-                    os.path.join(image_path, each) for each in image_files
-                ]
-                data = get_data(image_files, '', captions, tokenizer,
-                                image_transform)
-                input_data.append(data)
-
-            input_data = collate_fn(input_data)
-
-            input_data = recursive_to_device(input_data, 'cuda')
-            with torch.no_grad():
-                loss_dict = model(input_data)
-                loss = sum(loss_dict.values())
-                loss_score.append(loss.item())
-            progbar.add(1, values=[
-                ('val_loss', loss.item()),
-            ])
-            
-        score = np.mean(loss_score)
-        if score <= best_score:
-            FAIL_EPOCH = 0
-            best_score = score
-            best_epoch = epoch
-        else:
-            FAIL_EPOCH += 1
-
-        if FAIL_EPOCH == STOP_EPOCH:
-            print(
-                f"Early stop at epoch {epoch}, get best in epoch {best_epoch}")
-            break
+        # os.makedirs('./ckpt/', exist_ok=True)
+        torch.save(model.state_dict(),
+                   f'./ckpt/GIT_DCB_{dataset_name}_{description}_epoch{epoch}.pth')
 
         # cal decode result
         '''
@@ -456,10 +529,14 @@ def dcb_train():
             ])
         f.close()
         '''
+
+
 def speed_test_forward_backward():
     duplicate = 32
-    image_files = ['aux_data/images/1.jpg', 'aux_data/images/2.jpg'] * duplicate
-    captions = ['a couple of boats in a large body of water.', 'a view of a mountain with a tree'] * duplicate
+    image_files = ['aux_data/images/1.jpg',
+                   'aux_data/images/2.jpg'] * duplicate
+    captions = ['a couple of boats in a large body of water.',
+                'a view of a mountain with a tree'] * duplicate
 
     prefixs = [''] * len(captions)
     cfg = {
@@ -471,13 +548,15 @@ def speed_test_forward_backward():
         'no_flip': True,
         'no_aspect_dist': True,
         'interpolation': 'bicubic',
-        'min_size_range32': [160, 224], # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
+        # in pretraining, it is multi-scale from 160 to 224; while for fine-tuning, it is single scale
+        'min_size_range32': [160, 224],
         'patch_size': 16,
         'train_transform': 'vitp',
     }
     cfg = Config(cfg, {})
     all_data = []
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained(
+        'bert-base-uncased', do_lower_case=True)
     image_transform = get_image_transform(cfg)
     for image_file, prefix, target in zip(image_files, prefixs, captions):
         data = get_data([image_file, image_file, image_file, image_file],
@@ -525,4 +604,3 @@ if __name__ == '__main__':
     function_name = kwargs['type']
     del kwargs['type']
     locals()[function_name](**kwargs)
-

@@ -181,7 +181,7 @@ def create_decoder(decoder_type, norm_type,
                    num_layers,
                    output_hidden_states=False,
                    use_mlp_wrapper=None,
-                   vocab_size=30522
+                   vocab_size=21128
                    ):
     assert norm_type in ['post', 'pre']
     if decoder_type is None:
@@ -845,6 +845,22 @@ class CaptioningModel(nn.Module):
     def forward_one(self, batch, return_info=False):
         # shape: (batch_size, max_caption_length, vocab_size)
         if 'image' in batch:
+            # import pdb; pdb.set_trace()
+            # #BZ * frame * 3 * 160 * 160
+            # input = batch['image'].reshape(-1,batch['image'].shape[-3],batch['image'].shape[-2],batch['image'].shape[-1])
+            # features = self.image_encoder(input)
+            # features = features.reshape(batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1]).
+            # if self.num_image_with_embedding:
+            #     for i in range(self.num_image_with_embedding):
+            #         features[:, i] += self.img_temperal_embedding[i]
+            
+            # if self.pooling_images == 'avg':
+            #     visual_features = torch.mean(features, dim=1)
+            # elif self.pooling_images is None:
+            #     visual_features = features.reshape(features.shape[0],-1, 768)
+            
+            import pdb; pdb.set_trace()
+            
             if isinstance(batch['image'], (list, tuple)):
                 features = [self.image_encoder(im) for im in batch['image']]
                 if self.num_image_with_embedding:
@@ -935,7 +951,7 @@ class CaptioningModel(nn.Module):
             output_dict = {}
             #output_logits = x['output_logits']
             #ipdb> output_logits.shape
-            #torch.Size([2, 13, 30522])
+            #torch.Size([2, 13, 21128])
             #ipdb> batch['caption_tokens'].shape
             #torch.Size([2, 13])
             if 'need_predict' in batch:

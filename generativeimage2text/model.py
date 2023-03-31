@@ -1,10 +1,15 @@
-from .torch_common import resize_2d_pos_embed
+from torch_common import resize_2d_pos_embed
 import torch
-from .layers.CLIP import clip
-from .layers.decoder import CaptioningModel
-from .layers.decoder import (TransformerDecoderTextualHead,
-                             AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
-
+try:
+    from .layers.CLIP import clip
+    from .layers.decoder import CaptioningModel
+    from .layers.decoder import (TransformerDecoderTextualHead,
+                                AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
+except:
+    from layers.CLIP import clip
+    from layers.decoder import CaptioningModel
+    from layers.decoder import (TransformerDecoderTextualHead,
+                                AutoRegressiveBeamSearch, GeneratorWithBeamSearch)   
 
 def get_git_model(tokenizer, param):
     image_encoder = get_image_encoder(
