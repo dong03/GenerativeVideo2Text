@@ -241,12 +241,15 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id):
         payload = payload[-(max_text_len - 2):]
     input_ids = [tokenizer.cls_token_id] + payload
     prefix = torch.tensor(input_ids).unsqueeze(0).to(device)
-    root = '/data/dcb/bv/FrameWithTextData'
-    videos = open('/home/dcb/code/bv/captioning/cmo/BV_0321_videopath.txt',
+    
+
+    root = '/data/dcb/VisualSearch/vatex_val/ImageData'
+    videos = open('/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch.txt',
                   encoding='utf-8').readlines()
-    videos = [each.strip().split('\t')[0] for each in videos]
-    with open(f'{nabu}_com.txt', 'w') as f:
+    videos = [each.strip().split('\t')[0].split('#')[0] for each in videos]
+    with open(f'{model_name}_com.txt', 'w') as f:
         for ix, bv in enumerate(tqdm(videos)):
+            
             try:
                 # import pdb; pdb.set_trace()
                 import time

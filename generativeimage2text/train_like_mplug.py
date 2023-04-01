@@ -1,31 +1,29 @@
-import argparse
-import os
-import ruamel.yaml as yaml
-import language_evaluation
-import numpy as np
-import random
-import time
-import datetime
-import json
-from pathlib import Path
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-import torch.backends.cudnn as cudnn
-import torch.distributed as dist
-from transformers import ChineseCLIPProcessor
-
-import utils
-from dataset.utils import save_result
-from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
-
-from scheduler import create_scheduler
-from optim import create_optimizer, create_two_optimizer
-from transformers import ChineseCLIPProcessor
-from model import get_git_model
 from torch_common import torch_load, load_state_dict
+from model import get_git_model
+from optim import create_optimizer, create_two_optimizer
+from scheduler import create_scheduler
+from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
+from dataset.utils import save_result
+import utils
+from transformers import ChineseCLIPProcessor
+import torch.distributed as dist
+import torch.backends.cudnn as cudnn
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+import torch.nn as nn
+import torch
+from pathlib import Path
+import json
+import datetime
+import time
+import random
+import numpy as np
+import language_evaluation
+import ruamel.yaml as yaml
+import os
+import argparse
+import matplotlib
+matplotlib.use('TKAgg')
 
 
 def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device, scheduler, config, do_amp=False,
@@ -73,12 +71,11 @@ def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device,
         input_data = {
             'image': image,
             'need_predict': caption['attention_mask'],
-            'input_ids': caption['input_ids'],
-            'caption': {},
-            'iteration': 0,
-
+            'caption_tokens': caption['input_ids'],
         }
-        loss = model(input_data)
+        loss_dict = model(input_data)
+        loss = sum([v for v in loss_dict.values()])
+        # import pdb; pdb.set_trace()
         if accum_steps > 1:
             loss = loss / accum_steps
 
@@ -105,8 +102,8 @@ def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device,
             scheduler.step(i // step_size)
 
         del image, question_input, caption, loss
-        if i == 11:
-            break
+        # if i == 5:
+        #     break
 
         # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -122,31 +119,46 @@ def evaluation(model, data_loader, tokenizer, device, config):
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Generate caption test result:'
-    print_freq = 50
+    print_freq = 5
 
-    result = []
+    ral_val = []
 
     answer_input = None
     for n, (image, image_names, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         image = image.to(device, non_blocking=True)
-        question_input = None
 
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
-
-        topk_ids, topk_probs = model(
-            image, question_input, caption, train=False)
-
-        for image_id, topk_id, topk_prob, gold_caption_list in zip(image_names, topk_ids, topk_probs, caption['input_ids']):
-            ans = tokenizer.decode(topk_id[0]).replace("[SEP]", "").replace(
+        from tqdm import tqdm
+        for i in tqdm(range(len(image_names))):
+            input_data = {
+                'image': image[i:i+1],
+                'need_predict': caption['attention_mask'][i:i+1],
+                'caption_tokens': caption['input_ids'][i:i+1],
+            }
+            result = model(input_data)
+        # for i in range(result['predictions'].shape[0]):
+            cap = tokenizer.decode(
+                result['predictions'][0],
+                skip_special_tokens=True)
+            cap = cap.replace(
                 "[CLS]", "").replace("[PAD]", "").strip()
-            result.append({
-                "question_id": image_id,
-                "pred_caption": ans,
-                "gold_caption": tokenizer.decode(gold_caption_list).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip()})
-        # if n == 10:
-        #     break
-    return result
+            ral_val.append({
+                "question_id": image_names[i],
+                "pred_caption": cap,
+                "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip()})
+
+        # import
+        # for image_id, topk_id, topk_prob, gold_caption_list in zip(image_names, topk_ids, topk_probs, caption['input_ids']):
+        #     ans = tokenizer.decode(topk_id[0]).replace("[SEP]", "").replace(
+        #         "[CLS]", "").replace("[PAD]", "").strip()
+        #     result.append({
+        #         "question_id": image_id,
+        #         "pred_caption": ans,
+        #         "gold_caption": tokenizer.decode(gold_caption_list).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip()})
+        if n == 5:
+            break
+    return ral_val
 
 
 def cal_metric(result_file):
@@ -280,13 +292,20 @@ def main(args, config):
                 'config': config,
                 'epoch': epoch,
             }, os.path.join(args.output_dir, 'checkpoint_%02d.pth' % epoch))
+            log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+                         'epoch': epoch,
+                         }
+            print(log_stats)
+            with open(os.path.join(args.output_dir, "log.txt"), "a") as f:
+                f.write(json.dumps(log_stats) + "\n")
 
-        vqa_result = evaluation(model, test_loader, tokenizer, device, config)
-        result_file = save_result(
-            vqa_result, args.output_dir, 'bv_result_epoch%d' % epoch)
-        import pdb
-        pdb.set_trace()
-        if utils.is_main_process():
+            vqa_result = evaluation(
+                model, test_loader, tokenizer, device, config)
+            result_file = save_result(
+                vqa_result, args.output_dir, 'bv_result_epoch%d' % epoch)
+            '''
+            import pdb
+            pdb.set_trace()
             result = cal_metric(result_file)
             log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                          'epoch': epoch,
@@ -295,11 +314,11 @@ def main(args, config):
             print(log_stats)
             with open(os.path.join(args.output_dir, "log.txt"), "a") as f:
                 f.write(json.dumps(log_stats) + "\n")
-
+            # '''
         dist.barrier()
 
-    #vqa_result = evaluation(model, test_loader, tokenizer, device, config)
-    #result_file = save_result(vqa_result, args.result_dir, 'vqa_result_epoch%d' % epoch)
+    # vqa_result = evaluation(model, test_loader, tokenizer, device, config)
+    # result_file = save_result(vqa_result, args.result_dir, 'vqa_result_epoch%d' % epoch)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

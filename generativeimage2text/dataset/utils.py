@@ -27,7 +27,7 @@ def pre_question(question, max_ques_words):
 
 def pre_caption(caption, max_words):
     caption = re.sub(
-        r"([,.'!?\"()*#:;~])",
+        "[.!+-=—,$%^，。｡_:･ω･｡？?、~@#ಡωಡ，￣▽￣ ∇ﾉ♡セナスペシャルブ·：～×￥%……&*《（）》℃<>’“”‘|！*］《（）》℃<>’“”‘！「『』{}>【】」()/\\[]'\"]",
         '',
         caption.lower(),
     ).replace('-', ' ').replace('/', ' ').replace('<person>', 'person')
@@ -91,7 +91,8 @@ def save_result(result, result_dir, filename, is_json=True, is_list=True, remove
         result_file = os.path.join(
             result_dir, '%s_rank%d.json' % (filename, utils.get_rank()))
         final_result_file = os.path.join(result_dir, '%s.json' % filename)
-        json.dump(result, open(result_file, 'w'))
+        json.dump(result, open(result_file, 'w', encoding='utf-8'),
+                  indent=4, ensure_ascii=False)
     else:
         result_file = os.path.join(
             result_dir, '%s_rank%d.pth' % (filename, utils.get_rank()))
@@ -110,6 +111,8 @@ def save_result(result, result_dir, filename, is_json=True, is_list=True, remove
             if is_json:
                 result_file = os.path.join(
                     result_dir, '%s_rank%d.json' % (filename, rank))
+                if not os.path.exists(result_file):
+                    continue
                 res = json.load(open(result_file, 'r'))
             else:
                 result_file = os.path.join(

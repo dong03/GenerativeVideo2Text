@@ -3,21 +3,21 @@ train_root: '/data/dcb/VisualSearch/vatex_train/ImageData'
 train_file: '/data/dcb/VisualSearch/vatex_train/TextData/vatex_train.rawcaption_ch.txt'
 
 val_root: '/data/dcb/VisualSearch/vatex_val/ImageData'
-val_file: '/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch.txt'
+val_file: '/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch_pro.txt'
 
 test_root: '/data/dcb/VisualSearch/vatex_val/ImageData'
-test_file: '/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch.txt'
-freeze: 'all'
+test_file: '/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch_pro.txt'
+freeze: 'image'
 
 read_local_data: True
 
 model_name: 'GIT_BASE_VATEX'
 image_res: 224
-batch_size_train: 16
+batch_size_train: 8
 vision_width: 1024
-batch_size_test: 16
+batch_size_test: 8
 k_test: 128
-num_frm_test: 8
+num_frm_test: 4
 
 alpha: 0.4
 warm_up: True

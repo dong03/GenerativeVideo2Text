@@ -316,7 +316,7 @@ def dcb_val(model, step, val_dataset, dataset_name, tokenizer, image_transform, 
 
             for i in range(result['predictions'].shape[0]):
                 cap = tokenizer.decode(
-                    result['predictions'][0],
+                    result['predictions'][i],
                     skip_special_tokens=True)
                 f.write(f"{image_path}\t{cap}\n")
 
