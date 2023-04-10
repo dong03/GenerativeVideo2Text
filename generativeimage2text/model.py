@@ -1,9 +1,16 @@
-from .torch_common import resize_2d_pos_embed
 import torch
-from .layers.CLIP import clip
-from .layers.decoder import CaptioningModel
-from .layers.decoder import (TransformerDecoderTextualHead,
-                             AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
+try:
+    from .torch_common import resize_2d_pos_embed
+    from .layers.CLIP import clip
+    from .layers.decoder import CaptioningModel
+    from .layers.decoder import (TransformerDecoderTextualHead,
+                                 AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
+except:
+    from torch_common import resize_2d_pos_embed
+    from layers.CLIP import clip
+    from layers.decoder import CaptioningModel
+    from layers.decoder import (TransformerDecoderTextualHead,
+                                AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
 
 
 def get_git_model(tokenizer, param):
@@ -17,23 +24,23 @@ def get_git_model(tokenizer, param):
         hidden_size=768,
         num_layers=6,
         attention_heads=12,
-        feedforward_size=768* 4,
+        feedforward_size=768 * 4,
         max_caption_length=1024,
         mask_future_positions=True,
         padding_idx=0,
         decoder_type='bert_en',
         visual_projection_type='linearLn',
     )
-    #decoder = AutoRegressiveBeamSearch(
-        #eos_index=tokenizer.sep_token_id,
-        #max_steps=40,
-        #beam_size=1,
-        #per_node_beam_size=1,
-        #fix_missing_prefix=True,
-    #)
+    # decoder = AutoRegressiveBeamSearch(
+    # eos_index=tokenizer.sep_token_id,
+    # max_steps=40,
+    # beam_size=1,
+    # per_node_beam_size=1,
+    # fix_missing_prefix=True,
+    # )
     decoder = GeneratorWithBeamSearch(
         eos_index=tokenizer.sep_token_id,
-        #max_steps=40,
+        # max_steps=40,
         max_steps=1024,
         beam_size=4,
         length_penalty=0.6,
@@ -51,6 +58,7 @@ def get_git_model(tokenizer, param):
         num_image_with_embedding=param.get('num_image_with_embedding')
     )
     return model
+
 
 def get_image_encoder(encoder_type, input_resolution=224):
     name_map = {
@@ -72,13 +80,12 @@ def get_image_encoder(encoder_type, input_resolution=224):
             pos = ret.attnpool.positional_embedding
             patch_size = 32
         p2 = resize_2d_pos_embed(pos,
-                            ret.input_resolution,
-                            patch_size,
-                            input_resolution)
+                                 ret.input_resolution,
+                                 patch_size,
+                                 input_resolution)
         ret.input_resolution = input_resolution
         if encoder_type in ['CLIPViT_B_16', 'CLIPViT_L_14']:
             ret.positional_embedding = torch.nn.Parameter(p2)
         else:
             ret.attnpool.positional_embedding = torch.nn.Parameter(p2)
     return ret
-

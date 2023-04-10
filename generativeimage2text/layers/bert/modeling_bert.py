@@ -51,7 +51,7 @@ class BertConfig(PretrainedConfig):
     pretrained_config_archive_map = BERT_PRETRAINED_CONFIG_ARCHIVE_MAP
 
     def __init__(self,
-                 vocab_size_or_config_json_file=30522,
+                 vocab_size_or_config_json_file=21128,
                  hidden_size=768,
                  num_hidden_layers=12,
                  num_attention_heads=12,
