@@ -99,7 +99,7 @@ def save_result(result, result_dir, filename, is_json=True, is_list=True, remove
         final_result_file = os.path.join(result_dir, '%s.pth' % filename)
         torch.save(result, result_file)
 
-    dist.barrier()
+    # dist.barrier()
 
     if utils.is_main_process():
         # combine results from all processes
@@ -136,7 +136,7 @@ def save_result(result, result_dir, filename, is_json=True, is_list=True, remove
             torch.save(result, final_result_file)
 
         print('result file saved to %s' % final_result_file)
-    dist.barrier()
+    # dist.barrier()
     return final_result_file
 
 

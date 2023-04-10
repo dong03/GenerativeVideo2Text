@@ -167,10 +167,8 @@ class dcb_images_caps_dataset(Dataset):
             video = self._load_video_from_path(video_path)
             cap = pre_caption(cap, 128)
         except:
-            import pdb
-            pdb.set_trace()
             print(index)
-            video = torch.zeros((self.num_frm, 3, 336, 336))
+            video = torch.zeros((self.num_frm, 3, 224, 224))
             video_name = ''
             cap = ''
         return video, video_name, cap

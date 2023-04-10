@@ -23,7 +23,7 @@ import ruamel.yaml as yaml
 import os
 import argparse
 import matplotlib
-matplotlib.use('TKAgg')
+matplotlib.use('Agg')
 
 
 def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device, scheduler, config, do_amp=False,
@@ -315,7 +315,8 @@ def main(args, config):
             with open(os.path.join(args.output_dir, "log.txt"), "a") as f:
                 f.write(json.dumps(log_stats) + "\n")
             # '''
-        dist.barrier()
+
+        # dist.barrier()
 
     # vqa_result = evaluation(model, test_loader, tokenizer, device, config)
     # result_file = save_result(vqa_result, args.result_dir, 'vqa_result_epoch%d' % epoch)
