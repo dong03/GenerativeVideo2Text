@@ -19,6 +19,8 @@ from volcengine.Credentials import Credentials
 from volcengine.ServiceInfo import ServiceInfo
 from volcengine.base.Service import Service
 from tqdm import tqdm
+from transformers import BertTokenizer, ChineseCLIPProcessor
+
 
 
 def _load_video_from_path_decord(video_path,
@@ -57,20 +59,24 @@ def _load_video_from_path_decord(video_path,
 
 
 @st.cache_resource
-def get_model(model_name='GIT_LARGE_VATEX', prefix=''):
+def get_model(model_name='GIT_BASE_VATEX', prefix=''):
     device = torch.device(f"cpu")
     param = {}
     if File.isfile(f'aux_data/models/{model_name}/parameter.yaml'):
         param = load_from_yaml_file(
             f'aux_data/models/{model_name}/parameter.yaml')
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',
-                                              do_lower_case=True)
+    # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',
+    #                                          do_lower_case=True)
+    tokenizer = ChineseCLIPProcessor.from_pretrained(
+            "OFA-Sys/chinese-clip-vit-base-patch16")
+    tokenizer = tokenizer.tokenizer
     transforms = get_image_transform(param)
 
     model = get_git_model(tokenizer, param)
-    pretrained = f'output/{model_name}/snapshot/model.pt'
+    # pretrained = f'output/{model_name}/snapshot/model.pt'
     # import pdb; pdb.set_trace()
+    pretrained = '/home/dcb/code/bv/GenerativeImage2Text/output/git_randombv.pth'
     checkpoint = torch.load(pretrained, map_location='cpu')['model']
     load_state_dict(model, checkpoint)
     model.to(device)

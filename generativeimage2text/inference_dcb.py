@@ -28,6 +28,7 @@ from .torch_common import torch_load
 from .torch_common import load_state_dict
 from .process_image import load_image_by_pil
 from .model import get_git_model
+from transformers import ChineseCLIPProcessor
 
 
 class MinMaxResizeForTest(object):
@@ -181,7 +182,7 @@ def batch_dcb_inference_single_image(model_name, prefix, gpu_id):
                 print(bv)
 
 
-def each_dcb_inference_single_image(model_name, prefix, gpu_id):
+def each_dcb_inference_single_image(model_name, prefix, gpu_id, ckpt=None):
     device = torch.device(f"cuda:{gpu_id}")
 
     param = {}
@@ -189,8 +190,13 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id):
         param = load_from_yaml_file(
             f'aux_data/models/{model_name}/parameter.yaml')
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',
-                                              do_lower_case=True)
+    if ckpt:
+        tokenizer = ChineseCLIPProcessor.from_pretrained(
+            "OFA-Sys/chinese-clip-vit-base-patch16")
+        tokenizer = tokenizer.tokenizer
+    else:
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',
+                                                  do_lower_case=True)
     transforms = get_image_transform(param)
 
     # model
@@ -219,13 +225,17 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id):
     # tokenizer = tokenizer.tokenizer
     # transforms = get_transform_image(cfg, False)
     # model = get_git_model(tokenizer, param)
-
-    pretrained = f'output/{model_name}/snapshot/model.pt'
-    # import pdb; pdb.set_trace()
-    checkpoint = torch.load(pretrained, map_location='cpu')['model']
-    # ckpt = torch.load('ckpt/GIT_BV_epoch9.pth', map_location='cpu')
-    # model.load_state_dict(ckpt)
-    load_state_dict(model, checkpoint)
+    if ckpt:
+        pass
+        checkpoint = torch.load(ckpt, map_location='cpu')['model']
+        load_state_dict(model, checkpoint)
+    else:
+        pretrained = f'output/{model_name}/snapshot/model.pt'
+        # import pdb; pdb.set_trace()
+        checkpoint = torch.load(pretrained, map_location='cpu')['model']
+        # ckpt = torch.load('ckpt/GIT_BV_epoch9.pth', map_location='cpu')
+        # model.load_state_dict(ckpt)
+        load_state_dict(model, checkpoint)
     model.to(device)
     model.eval()
 
@@ -242,10 +252,12 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id):
     input_ids = [tokenizer.cls_token_id] + payload
     prefix = torch.tensor(input_ids).unsqueeze(0).to(device)
     root = '/data/dcb/bv/FrameWithTextData'
-    videos = open('/home/dcb/code/bv/captioning/cmo/BV_0321_videopath.txt',
-                  encoding='utf-8').readlines()
+    file = '/home/dcb/code/bv/captioning/cmo/BV_0321_videopath.txt'
+    # file = '/home/dcb/code/bv/captioning/bvcap_test_cap.txt'
+    videos = open(file, encoding='utf-8').readlines()
     videos = [each.strip().split('\t')[0] for each in videos]
-    with open(f'{nabu}_com.txt', 'w') as f:
+    name_plus = os.path.split(ckpt)[-1] if ckpt else ''
+    with open(f'{model_name}_{name_plus}_cmo.txt', 'w') as f:
         for ix, bv in enumerate(tqdm(videos)):
             try:
                 # import pdb; pdb.set_trace()
