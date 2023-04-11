@@ -2,23 +2,35 @@ import torch
 try:
     from .torch_common import resize_2d_pos_embed
     from .layers.CLIP import clip
-    from .layers.decoder import CaptioningModel
+    from .layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel
     from .layers.decoder import (TransformerDecoderTextualHead,
+                                 TransformerDecoderClfTextualHead,
                                  AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
 except:
     from torch_common import resize_2d_pos_embed
     from layers.CLIP import clip
-    from layers.decoder import CaptioningModel
+    from layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel
     from layers.decoder import (TransformerDecoderTextualHead,
+                                TransformerDecoderClfTextualHead,
                                 AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
 
 
-def get_git_model(tokenizer, param):
+def get_git_model(tokenizer, param, dcb_param=None):
     image_encoder = get_image_encoder(
         param.get('image_encoder_type', 'CLIPViT_B_16'),
         input_resolution=param.get('test_crop_size', 224),
     )
-    text_decoder = TransformerDecoderTextualHead(
+    if dcb_param is not None and dcb_param['vtm'] and not dcb_param['dense']:
+        TEXT_ENCODER = TransformerDecoderClfTextualHead
+        CAP_MODEL = CaptioningVTMModel
+    elif dcb_param is not None and not dcb_param['vtm'] and dcb_param['dense']:
+        TEXT_ENCODER = TransformerDecoderClfTextualHead
+        CAP_MODEL = CaptioningDenseModel
+    else:
+        TEXT_ENCODER = TransformerDecoderTextualHead
+        CAP_MODEL = CaptioningModel
+
+    text_decoder = TEXT_ENCODER(
         visual_feature_size=param.get('visual_feature_size', 768),
         vocab_size=tokenizer.vocab_size,
         hidden_size=768,
@@ -46,7 +58,7 @@ def get_git_model(tokenizer, param):
         length_penalty=0.6,
     )
 
-    model = CaptioningModel(
+    model = CAP_MODEL(
         image_encoder,
         text_decoder,
         decoder=decoder,

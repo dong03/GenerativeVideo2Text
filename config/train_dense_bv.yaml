@@ -1,10 +1,10 @@
 dataset_name: 'BV'
-train_root: '/data/dcb/bv/FrameWithTextData'
+train_root: '/data/caz/VisualSearch/B52/Videos'
 train_file: '/home/dcb/code/bv/CNXCLIP/dataset/train_bv.txt'
-val_root: '/data/dcb/bv/FrameWithTextData'
+val_root: '/data/caz/VisualSearch/B52/Videos'
 val_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
 
-test_root: '/data/dcb/bv/FrameWithTextData'
+test_root: '/data/caz/VisualSearch/B52/Videos'
 test_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
 
 freeze: 'image'
@@ -16,9 +16,9 @@ batch_size_train: 8
 vision_width: 1024
 batch_size_test: 8
 k_test: 128
-num_frm_test: 4
+num_frm_test: 64
 vtm: False
-dense: False
+dense: True
 alpha: 0.4
 warm_up: True
 
