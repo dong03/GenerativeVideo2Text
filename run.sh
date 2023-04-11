@@ -3,14 +3,33 @@ AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
       'model_name': 'GIT_BASE_VATEX', \
       'prefix': '', \
       'gpu_id': '0', \
-      'ckpt': '/home/dcb/code/bv/git_aimc/ckpt/caption_git_large_dcb_bv/freezeimage_captitle03-09-22/checkpoint_09.pth'
+      'ckpt': './output/git_randombv.pth'
 }"
+
+
 # AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
 # "{'type': 'each_dcb_inference_single_image', \
 #       'model_name': 'GIT_BASE_VATEX', \
 #       'prefix': '', \
 #       'gpu_id': '0', \
+#       'prefix': 'what is it?'
 # }"
+
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE_VQAv2', \
+#       'prefix': '', \
+#       'gpu_id': '0',
+# }"
+
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE_VQAv2', \
+#       'prefix': '', \
+#       'gpu_id': '0', \
+#       'prefix': 'what is it?'
+# }"
+
 # model_name: 'GIT_LARGE_COCO', 'GIT_LARGE_TEXTCAPS', 'GIT_LARGE_VATEX'
 
 
