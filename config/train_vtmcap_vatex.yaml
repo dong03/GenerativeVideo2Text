@@ -1,11 +1,12 @@
 dataset_name: 'BV'
-train_root: '/data/dcb/bv/FrameWithTextData'
-train_file: '/home/dcb/code/bv/CNXCLIP/dataset/train_bv.txt'
-val_root: '/data/dcb/bv/FrameWithTextData'
-val_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
+train_root: '/data/dcb/VisualSearch/vatex_train/ImageData'
+train_file: '/data/dcb/VisualSearch/vatex_train/TextData/vatex_train.rawcaption_ch.txt'
 
-test_root: '/data/dcb/bv/FrameWithTextData'
-test_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
+val_root: '/data/dcb/VisualSearch/vatex_val/ImageData'
+val_file: '/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch_pro.txt'
+
+test_root: '/data/dcb/VisualSearch/vatex_val/ImageData'
+test_file: '/data/dcb/VisualSearch/vatex_val/TextData/vatex_val.rawcaption_ch_pro.txt'
 
 freeze: 'image'
 read_local_data: True

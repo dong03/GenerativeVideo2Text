@@ -1,4 +1,4 @@
-TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python -m torch.distributed.launch --nproc_per_node=$2 --master_port=3225  --use_env train_like_mplug.py \
+TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python -m torch.distributed.launch --nproc_per_node=$2 --master_port=3228  --use_env train_like_mplug.py \
     --config /home/dcb/code/bv/git_aimc/config/train_dense_bv.yaml \
     --output_dir /home/dcb/code/bv/git_aimc/ckpt/caption_git_large_dcb_bv/dense_bv$(date +'%d-%H-%M')/ \
     --do_two_optim \

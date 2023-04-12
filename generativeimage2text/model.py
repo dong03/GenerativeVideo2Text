@@ -24,7 +24,7 @@ def get_git_model(tokenizer, param, dcb_param=None):
         TEXT_ENCODER = TransformerDecoderClfTextualHead
         CAP_MODEL = CaptioningVTMModel
     elif dcb_param is not None and not dcb_param['vtm'] and dcb_param['dense']:
-        TEXT_ENCODER = TransformerDecoderClfTextualHead
+        TEXT_ENCODER = TransformerDecoderTextualHead
         CAP_MODEL = CaptioningDenseModel
     else:
         TEXT_ENCODER = TransformerDecoderTextualHead
