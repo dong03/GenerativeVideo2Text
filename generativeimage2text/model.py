@@ -2,14 +2,14 @@ import torch
 try:
     from .torch_common import resize_2d_pos_embed
     from .layers.CLIP import clip
-    from .layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel
+    from .layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel
     from .layers.decoder import (TransformerDecoderTextualHead,
                                  TransformerDecoderClfTextualHead,
                                  AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
 except:
     from torch_common import resize_2d_pos_embed
     from layers.CLIP import clip
-    from layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel
+    from layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel
     from layers.decoder import (TransformerDecoderTextualHead,
                                 TransformerDecoderClfTextualHead,
                                 AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
@@ -20,16 +20,24 @@ def get_git_model(tokenizer, param, dcb_param=None):
         param.get('image_encoder_type', 'CLIPViT_B_16'),
         input_resolution=param.get('test_crop_size', 224),
     )
-    if dcb_param is not None and dcb_param['vtm'] and not dcb_param['dense']:
-        TEXT_ENCODER = TransformerDecoderClfTextualHead
-        CAP_MODEL = CaptioningVTMModel
-    elif dcb_param is not None and not dcb_param['vtm'] and dcb_param['dense']:
-        TEXT_ENCODER = TransformerDecoderTextualHead
-        CAP_MODEL = CaptioningDenseModel
-    else:
+    if dcb_param is None:
         TEXT_ENCODER = TransformerDecoderTextualHead
         CAP_MODEL = CaptioningModel
-
+    else:
+        if dcb_param['vtm'] and dcb_param['dense']:
+            TEXT_ENCODER = TransformerDecoderClfTextualHead
+            CAP_MODEL = CaptioningVTMDenseModel
+        elif not dcb_param['vtm'] and not dcb_param['dense']:
+            TEXT_ENCODER = TransformerDecoderTextualHead
+            CAP_MODEL = CaptioningModel
+        elif not dcb_param['vtm']:
+            TEXT_ENCODER = TransformerDecoderTextualHead
+            CAP_MODEL = CaptioningDenseModel
+        elif not dcb_param['dense']:
+            TEXT_ENCODER = TransformerDecoderClfTextualHead
+            CAP_MODEL = CaptioningVTMModel
+        else:
+            raise NotImplementedError
     text_decoder = TEXT_ENCODER(
         visual_feature_size=param.get('visual_feature_size', 768),
         vocab_size=tokenizer.vocab_size,

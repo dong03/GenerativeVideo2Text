@@ -7,6 +7,9 @@ from pprint import pformat
 import functools
 import random
 import pdb
+from .bert import BertConfig
+from .bert.modeling_bert import BertEncoder
+from .bert.xbert import BertEncoder as BertCrossAttEncoder
 
 
 class TextualHead(nn.Module):
@@ -207,8 +210,6 @@ def create_decoder(decoder_type, norm_type,
     if decoder_type is None:
         assert NotImplemented
     elif decoder_type == 'bert_en':
-        from .bert import BertConfig
-        from .bert.modeling_bert import BertEncoder
         config = BertConfig(
             vocab_size_or_config_json_file=vocab_size,
             hidden_size=textual_feature_size,
@@ -666,10 +667,11 @@ class ClassificationHead(nn.Module):
 
 
 class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
-    def __init__(self, visual_feature_size: int, vocab_size: int, hidden_size: int, num_layers: int, attention_heads: int, feedforward_size: int, dropout: float = 0.1, norm_type: str = "post", mask_future_positions: bool = True, max_caption_length: int = 30, padding_idx: int = 0, decoder_type=None, visual_projection_type=None, not_tie_weight=None, output_hidden_states=None, use_mlp_wrapper=None, cosine_linear=False):
+    def __init__(self, visual_feature_size: int, vocab_size: int, hidden_size: int, num_layers: int, attention_heads: int, feedforward_size: int, dropout: float = 0.1, norm_type: str = "post", mask_future_positions: bool = True, max_caption_length: int = 30, padding_idx: int = 0, decoder_type=None, visual_projection_type=None, not_tie_weight=None, output_hidden_states=None, use_mlp_wrapper=None, cosine_linear=False, ):
         super().__init__(visual_feature_size, vocab_size, hidden_size, num_layers, attention_heads, feedforward_size, dropout, norm_type, mask_future_positions,
                          max_caption_length, padding_idx, decoder_type, visual_projection_type, not_tie_weight, output_hidden_states, use_mlp_wrapper, cosine_linear)
-        self.classifier = ClassificationHead(hidden_size=768*2)
+
+        self.classifier = ClassificationHead(hidden_size=768)
         self.transformer = create_decoder(
             decoder_type=decoder_type,
             norm_type=norm_type,
@@ -684,6 +686,16 @@ class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
             cls_flag=True
         )
 
+        self.text_projection = create_projecton_layer(
+            None, self.textual_feature_size, self.textual_feature_size)
+        '''
+        config = self.transformer.encoder.config
+        config.num_hidden_layers = 2
+        config.fusion_layer = 0
+        config.chunk_size_feed_forward = 0
+        config.encoder_width = 768
+        self.crossattn = BertCrossAttEncoder(config)
+        '''
         self.apply(self._init_weights)
 
     def forward(
@@ -696,6 +708,7 @@ class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
         # caption_mask=None,
         encoder_history_states=None,
         return_dict=False,
+        text_feature=None
     ):
         if return_dict:
             ret = {}
@@ -705,16 +718,22 @@ class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
         if return_dict:
             ret['projected_visual_features'] = projected_visual_features
         batch_size, max_caption_length = caption_tokens.size()
-        caption_embeddings = self.embedding(caption_tokens)
 
-        # An additive mask for masking the future (one direction).
+        if text_feature is None:
+            caption_embeddings = self.embedding(caption_tokens)
+
+            # An additive mask for masking the future (one direction).
+
+            # We transpose the first two dimensions of tokens embeddings and visual
+            # features, as required by decoder.
+            caption_embeddings = caption_embeddings.transpose(0, 1)
+        else:
+            caption_embeddings = self.text_projection(
+                text_feature).transpose(0, 1)
+
         uni_mask_zero_neg = self._generate_future_mask(
             max_caption_length, caption_embeddings.dtype, caption_embeddings.device
         )
-
-        # We transpose the first two dimensions of tokens embeddings and visual
-        # features, as required by decoder.
-        caption_embeddings = caption_embeddings.transpose(0, 1)
         if projected_visual_features is not None:
             projected_visual_features = projected_visual_features.transpose(
                 0, 1)
@@ -755,9 +774,19 @@ class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
             ret['textual_features'] = textual_features
 
         # shape: (batch_size, max_caption_length, vocab_size)
-        cls_embedding = torch.cat(
-            [cls_embedding, torch.mean(projected_visual_features[::197].permute((1, 0, 2)), dim=1)], dim=1)
+        # import pdb
+        # pdb.set_trace()
+        '''
+        cls_embedding = self.crossattn(
+            hidden_states=trans_out.permute(1,0,2),
+            attention_mask = uni_mask_zero_neg,
+            encoder_hidden_states=projected_visual_features[::197].permute(1,0,2)
+        )
+        cls_embedding = cls_embedding.last_hidden_state[:, 0]
+        # cls_embedding = torch.cat(
+        #     [cls_embedding, torch.mean(projected_visual_features[::197].permute((1, 0, 2)), dim=1)], dim=1)
         # cls_embedding = textual_features[:, -1]
+        '''
         cls_prob = self.classifier(cls_embedding)
         output_logits = self.output(textual_features)
         if isinstance(trans_out, tuple):
@@ -1233,7 +1262,8 @@ class CaptioningModel(nn.Module):
             partial_captions = partial_captions.unsqueeze(1)
 
         # shape: (batch_size * beam_size, partial_caption_length, vocab_size)
-        logits, _ = self.textual(
+
+        temp = self.textual(
             visual_features,
             partial_captions,
             caption_lengths=caption_lengths,
@@ -1241,6 +1271,10 @@ class CaptioningModel(nn.Module):
             bi_valid_mask_caption=bi_valid_mask_caption,
             encoder_history_states=self.prev_encoded_layers,
         )
+        if type(temp) is tuple:
+            logits = temp[0]
+        else:
+            logits = temp
         if self.scst or self.use_history_for_infer:
             if isinstance(logits, tuple) and len(logits) == 2:
                 if self.prev_encoded_layers is None:
@@ -1319,10 +1353,11 @@ class CaptioningDenseModel(CaptioningModel):
 
 
 class CaptioningVTMModel(CaptioningModel):
-    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=6):
+    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=6, text_encoder=None):
         super().__init__(visual, textual, sos_index, eos_index, decoder, loss_type, context_not_share_embedding,
                          scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding)
         self.vtm_loss = nn.CrossEntropyLoss()
+        self.text_encoder = text_encoder
 
     @torch.no_grad()
     def infer_vtm(self, visual_features, caption_token_input, visual_features_valid, batch):
@@ -1352,33 +1387,48 @@ class CaptioningVTMModel(CaptioningModel):
             matrix = (torch.ones_like(matrix) - torch.eye(BZ)) * matrix
 
             vtmcap_visual_input = torch.cat(
-                [visual_features, visual_features.clone()], dim=0)
+                [visual_features, visual_features], dim=0)
+
+            if self.text_encoder is not None:
+                text_feature = self.text_encoder(
+                    input_ids=batch["caption_tokens"], attention_mask=batch['need_predict'])
+                text_feature = text_feature.last_hidden_state
+            else:
+                text_feature = None
 
             caption_token_input = batch["caption_tokens"]
             neg_token_input = []
+            neg_text_feature = [] if text_feature is not None else None
             for bz in range(BZ):
                 # try:
                 select_ix = torch.multinomial(matrix[bz] + 1e-4, 1).item()
                 # except:
                 #     pdb.set_trace()
-                neg_token_input.append(caption_token_input[select_ix].clone())
+                neg_token_input.append(caption_token_input[select_ix])
+                if neg_text_feature is not None:
+                    neg_text_feature.append(text_feature[select_ix])
 
             neg_token_input = torch.stack(neg_token_input)
+            neg_text_feature = torch.stack(
+                neg_text_feature) if neg_text_feature is not None else None
 
             vtmcap_token_input = torch.cat(
                 [caption_token_input, neg_token_input], dim=0)
+            all_text_feature = torch.cat(
+                [text_feature, neg_text_feature], dim=0) if text_feature is not None else None
 
             vtm_label = torch.tensor(
                 [1 for _ in range(BZ)] + [0 for _ in range(BZ)]).to(visual_features.device)
 
             #caption_lengths = batch["caption_lengths"]
-
+            # import pdb; pdb.set_trace()
             output_logits, cls_prob = self.textual(
                 vtmcap_visual_input,
                 vtmcap_token_input,
                 # caption_lengths=caption_lengths,
                 hidden_valid_mask=visual_features_valid,
                 bi_valid_mask_caption=batch.get('bi_valid_mask_caption'),
+                text_feature=all_text_feature
             )
             output_dict = {}
             loss_vtm = self.vtm_loss(cls_prob, vtm_label)
@@ -1432,6 +1482,72 @@ class CaptioningVTMModel(CaptioningModel):
             output_dict['cls_prob'] = cls_prob
 
         return output_dict
+
+
+class CaptioningVTMDenseModel(CaptioningVTMModel):
+    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=6):
+        super().__init__(visual, textual, sos_index, eos_index, decoder, loss_type, context_not_share_embedding,
+                         scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding)
+
+        self.vtm_loss = nn.CrossEntropyLoss()
+
+    def forward_one(self, batch, return_info=False):
+        # shape: (batch_size, max_caption_length, vocab_size)
+        if 'image' in batch:
+            #BZ * frame * 3 * 160 * 160
+            try:
+                input = batch['image'].reshape(-1, batch['image'].shape[-3],
+                                               batch['image'].shape[-2], batch['image'].shape[-1])
+                features = self.image_encoder(input)
+                features = features[:, 0, :]
+                features = features.reshape(
+                    batch['image'].shape[0], batch['image'].shape[1], -1)
+                # features = features.reshape(
+                #     batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1])
+                # if self.num_image_with_embedding:
+                #     for i in range(self.num_image_with_embedding):
+                #         features[:, i] += self.img_temperal_embedding[i]
+
+                if self.pooling_images == 'avg':
+                    visual_features = torch.mean(features, dim=1)
+                elif self.pooling_images is None:
+                    visual_features = features.reshape(
+                        features.shape[0], -1, 768)
+            except:
+                if isinstance(batch['image'], (list, tuple)):
+                    features = [self.image_encoder(im)
+                                for im in batch['image']]
+                    if self.num_image_with_embedding:
+                        features = [
+                            f + e for f, e in zip(features, self.img_temperal_embedding)]
+                    if self.pooling_images is None:
+                        visual_features = torch.cat(features, dim=1)
+                    elif self.pooling_images == 'avg':
+                        visual_features = torch.stack(
+                            features, dim=1).mean(dim=1)
+                    else:
+                        raise NotImplementedError
+                else:
+                    visual_features = self.image_encoder(batch['image'])
+        else:
+            visual_features = None
+        visual_features_valid = None
+        if 'context' in batch:
+            context_embedding = self.context_embedding if self.context_not_share_embedding else self.textual.embedding
+            all_context = [visual_features]
+            all_valid = [convert2valid(visual_features.shape[:2])]
+            for info in batch['context']:
+                context = context_embedding(info['tokens'])
+                valid = convert2valid(info['tokens'].shape, info['length'])
+                all_context.append(context)
+                all_valid.append(valid)
+            visual_features = torch.cat(all_context, dim=1)
+            visual_features_valid = torch.cat(all_valid, dim=1)
+        if not self.training or (not self.scst):
+            return self.forward_one_ce(batch, visual_features, visual_features_valid, return_info)
+        else:
+            assert self.training and self.scst
+            return self.forward_one_scst(batch, visual_features, visual_features_valid)
 
 
 class GeneratorWithBeamSearch(object):

@@ -48,7 +48,9 @@ def create_dataset(dataset, config, epoch=None):
 
         val_dataset = FRAME_DATASET(config['val_file'], config['val_root'], max_words=config['max_length'], read_local_data=config['read_local_data'],
                                     is_train=False, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform', transform=test_transform)
-        return train_dataset, val_dataset, val_dataset
+        test_dataset = FRAME_DATASET(config['test_file'], config['test_root'], max_words=config['max_length'], read_local_data=config['read_local_data'],
+                                     is_train=False, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform', transform=test_transform)
+        return train_dataset, val_dataset, test_dataset
 
 
 def cap_collate_fn(batch):

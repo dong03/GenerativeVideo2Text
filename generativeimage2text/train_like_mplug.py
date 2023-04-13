@@ -6,7 +6,7 @@ from scheduler import create_scheduler
 from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
 from dataset.utils import save_result
 import utils
-from transformers import ChineseCLIPProcessor
+from transformers import ChineseCLIPProcessor, ChineseCLIPModel
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 import torch
@@ -21,6 +21,8 @@ import ruamel.yaml as yaml
 import os
 import argparse
 import matplotlib
+from apex import amp
+import apex
 matplotlib.use('Agg')
 
 
@@ -136,7 +138,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 'caption_tokens': caption['input_ids'][i:i+1],
             }
             result = model(input_data)
-            cls_prob = result['cls_prob']
+            cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
         # for i in range(result['predictions'].shape[0]):
             cap = tokenizer.decode(
                 result['predictions'][0],
@@ -219,7 +221,7 @@ def main(args, config):
     train_loader, val_loader, test_loader = create_loader(datasets, samplers,
                                                           batch_size=[
                                                               config['batch_size_train'], config['batch_size_test'], config['batch_size_test']],
-                                                          num_workers=[32, 8, 8], is_trains=[True, False, False],
+                                                          num_workers=[16, 8, 8], is_trains=[True, False, False],
                                                           collate_fns=[cap_collate_fn, cap_collate_fn, cap_collate_fn])
 
     # tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
@@ -228,9 +230,21 @@ def main(args, config):
         "OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = tokenizer.tokenizer
     model = get_git_model(tokenizer, {}, config)
+
+    pretrained = f'/home/dcb/code/bv/git_aimc/output/{model_name}/snapshot/model.pt'
+    checkpoint = torch_load(pretrained)['model']
+
+    # for key in list(checkpoint.keys()):
+    #     if 'textual' in key:
+    #         del checkpoint[key]
+    load_state_dict(model, checkpoint)
+    temp_encoder = ChineseCLIPModel.from_pretrained(
+        "OFA-Sys/chinese-clip-vit-base-patch16").text_model
+    model.text_encoder = temp_encoder
+
     if config['freeze'] == 'image':
         for n, p in model.named_parameters():
-            if 'image_encoder' in n:
+            if 'image_encoder' in n or 'text_encoder' in n:
                 p.requires_grad = False
     elif config['freeze'] == 'all':
         for n, p in model.named_parameters():
@@ -239,16 +253,7 @@ def main(args, config):
     elif config['freeze'] == 'None':
         pass
     get_parameter_number(model)
-    pretrained = f'/home/dcb/code/bv/git_aimc/output/{model_name}/snapshot/model.pt'
-    checkpoint = torch_load(pretrained)['model']
-
-    for key in list(checkpoint.keys()):
-        if 'textual' in key:
-            del checkpoint[key]
-    load_state_dict(model, checkpoint)
-
     model = model.to(device)
-
     if not args.do_two_optim:
         arg_opt = utils.AttrDict(config['optimizer'])
         optimizer = create_optimizer(arg_opt, model)
@@ -260,13 +265,11 @@ def main(args, config):
     lr_scheduler, _ = create_scheduler(arg_sche, optimizer)
 
     if args.do_amp:
-        from apex import amp
         model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
 
     model_without_ddp = model
     if args.distributed:
         #model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
-        import apex
         model = apex.parallel.DistributedDataParallel(
             model, delay_allreduce=True)
         model_without_ddp = model.module
