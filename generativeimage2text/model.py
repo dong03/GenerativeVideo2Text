@@ -14,6 +14,8 @@ except:
                                 TransformerDecoderClfTextualHead,
                                 AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
 
+from transformers import ChineseCLIPModel
+
 
 def get_git_model(tokenizer, param, dcb_param=None):
     image_encoder = get_image_encoder(
@@ -21,24 +23,24 @@ def get_git_model(tokenizer, param, dcb_param=None):
         input_resolution=param.get('test_crop_size', 224),
     )
     if dcb_param is None:
-        TEXT_ENCODER = TransformerDecoderTextualHead
+        TEXT_DECODER = TransformerDecoderTextualHead
         CAP_MODEL = CaptioningModel
     else:
         if dcb_param['vtm'] and dcb_param['dense']:
-            TEXT_ENCODER = TransformerDecoderClfTextualHead
+            TEXT_DECODER = TransformerDecoderClfTextualHead
             CAP_MODEL = CaptioningVTMDenseModel
         elif not dcb_param['vtm'] and not dcb_param['dense']:
-            TEXT_ENCODER = TransformerDecoderTextualHead
+            TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningModel
         elif not dcb_param['vtm']:
-            TEXT_ENCODER = TransformerDecoderTextualHead
+            TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningDenseModel
         elif not dcb_param['dense']:
-            TEXT_ENCODER = TransformerDecoderClfTextualHead
+            TEXT_DECODER = TransformerDecoderClfTextualHead
             CAP_MODEL = CaptioningVTMModel
         else:
             raise NotImplementedError
-    text_decoder = TEXT_ENCODER(
+    text_decoder = TEXT_DECODER(
         visual_feature_size=param.get('visual_feature_size', 768),
         vocab_size=tokenizer.vocab_size,
         hidden_size=768,
@@ -75,7 +77,7 @@ def get_git_model(tokenizer, param, dcb_param=None):
         tokenizer=tokenizer,
         use_history_for_infer=True,
         loss_type='smooth',
-        num_image_with_embedding=param.get('num_image_with_embedding')
+        num_image_with_embedding=param.get('num_image_with_embedding'),
     )
     return model
 

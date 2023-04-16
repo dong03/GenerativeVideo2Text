@@ -63,7 +63,8 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
                 "vtm_score": cls_prob[0, 1].item()})
-
+            import pdb
+            pdb.set_trace()
         # import
         # for image_id, topk_id, topk_prob, gold_caption_list in zip(image_names, topk_ids, topk_probs, caption['input_ids']):
         #     ans = tokenizer.decode(topk_id[0]).replace("[SEP]", "").replace(
@@ -113,7 +114,8 @@ def main(args, config):
     tokenizer = tokenizer.tokenizer
     model = get_git_model(tokenizer, {}, config)
 
-    checkpoint = torch_load(args.checkpoint)['model']
+    checkpoint = torch.load(args.checkpoint, map_location='cpu')['model']
+    # model.load_state_dict(checkpoint)
     load_state_dict(model, checkpoint)
     # temp_encoder = ChineseCLIPModel.from_pretrained(
     #     "OFA-Sys/chinese-clip-vit-base-patch16").text_model

@@ -23,12 +23,12 @@ alpha: 0.4
 warm_up: True
 
 
-optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 5.0e-6, weight_decay: 0.02 }
+optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 1.0e-4, weight_decay: 0.02 }
 schedular:
   {
     sched: cosine,
     lr: 1.0e-4,
-    epochs: 8,
+    epochs: 18,
     min_lr: 1.0e-6,
     decay_rate: 1,
     warmup_lr: 1.0e-5,

@@ -6,7 +6,7 @@ from scheduler import create_scheduler
 from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
 from dataset.utils import save_result
 import utils
-from transformers import ChineseCLIPProcessor, ChineseCLIPModel
+from transformers import ChineseCLIPProcessor, ChineseCLIPModel, GPT2Model, AutoTokenizer
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 import torch
@@ -103,7 +103,7 @@ def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device,
             scheduler.step(i // step_size)
 
         del image, question_input, caption, loss
-        # if i == 5:
+        # if i:
         #     break
 
         # gather the stats from all processes
@@ -226,9 +226,11 @@ def main(args, config):
 
     # tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
     model_name = config['model_name']
-    tokenizer = ChineseCLIPProcessor.from_pretrained(
-        "OFA-Sys/chinese-clip-vit-base-patch16")
-    tokenizer = tokenizer.tokenizer
+    tokenizer = AutoTokenizer.from_pretrained('uer/gpt2-chinese-cluecorpussmall')
+    
+    # tokenizer = ChineseCLIPProcessor.from_pretrained(
+    #     "OFA-Sys/chinese-clip-vit-base-patch16")
+    # tokenizer = tokenizer.tokenizer
     model = get_git_model(tokenizer, {}, config)
 
     pretrained = f'/home/dcb/code/bv/git_aimc/output/{model_name}/snapshot/model.pt'
@@ -238,8 +240,9 @@ def main(args, config):
     #     if 'textual' in key:
     #         del checkpoint[key]
     load_state_dict(model, checkpoint)
-    temp_encoder = ChineseCLIPModel.from_pretrained(
-        "OFA-Sys/chinese-clip-vit-base-patch16").text_model
+    temp_encoder = GPT2Model.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
+    # temp_encoder = ChineseCLIPModel.from_pretrained(
+    #     "OFA-Sys/chinese-clip-vit-base-patch16").text_model
     model.text_encoder = temp_encoder
 
     if config['freeze'] == 'image':
