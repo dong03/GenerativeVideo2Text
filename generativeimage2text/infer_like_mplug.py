@@ -44,17 +44,27 @@ def evaluation(model, data_loader, tokenizer, device, config):
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
         from tqdm import tqdm
-        for i in tqdm(range(len(image_names))):
-            input_data = {
-                'image': image[i:i+1],
-                'need_predict': caption['attention_mask'][i:i+1],
-                'caption_tokens': caption['input_ids'][i:i+1],
-            }
-            result = model(input_data)
-            cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
-        # for i in range(result['predictions'].shape[0]):
+        input_data = {
+            'image': image,
+            'need_predict': caption['attention_mask'],
+            'caption_tokens': caption['input_ids'],
+        }
+        result = model(input_data)
+        cls_prob = result.get('cls_prob', torch.zeros((image.shape[0], 2)))
+
+        # for i in tqdm(range(len(image_names))):
+        #     input_data = {
+        #         'image': image[i:i+1],
+        #         'need_predict': caption['attention_mask'][i:i+1],
+        #         'caption_tokens': caption['input_ids'][i:i+1],
+        #     }
+        #     result = model(input_data)
+        #     cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
+        # import pdb
+        # pdb.set_trace()
+        for i in range(len(result['predictions'])):
             cap = tokenizer.decode(
-                result['predictions'][0],
+                result['predictions'][i][0],
                 skip_special_tokens=True)
             cap = cap.replace(
                 "[CLS]", "").replace("[PAD]", "").strip()
@@ -62,9 +72,11 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "question_id": image_names[i],
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
-                "vtm_score": cls_prob[0, 1].item()})
-            import pdb
-            pdb.set_trace()
+                "vtm_score": cls_prob[i, 1].item()})
+        if n:
+            break
+            # import pdb
+            # pdb.set_trace()
         # import
         # for image_id, topk_id, topk_prob, gold_caption_list in zip(image_names, topk_ids, topk_probs, caption['input_ids']):
         #     ans = tokenizer.decode(topk_id[0]).replace("[SEP]", "").replace(
@@ -104,7 +116,7 @@ def main(args, config):
     samplers = [None, None, None]
     _, _, test_loader = create_loader(datasets, samplers,
                                       batch_size=[
-                                          config['batch_size_train'], config['batch_size_test'], config['batch_size_test']*4],
+                                          config['batch_size_train'], config['batch_size_test'], 4],
                                       num_workers=[32, 8, 8], is_trains=[True, False, False],
                                       collate_fns=[cap_collate_fn, cap_collate_fn, cap_collate_fn])
 
@@ -114,12 +126,10 @@ def main(args, config):
     tokenizer = tokenizer.tokenizer
     model = get_git_model(tokenizer, {}, config)
 
+
     checkpoint = torch.load(args.checkpoint, map_location='cpu')['model']
     # model.load_state_dict(checkpoint)
     load_state_dict(model, checkpoint)
-    # temp_encoder = ChineseCLIPModel.from_pretrained(
-    #     "OFA-Sys/chinese-clip-vit-base-patch16").text_model
-    # model.text_encoder = temp_encoder
 
     model.eval()
     model = model.to(device)

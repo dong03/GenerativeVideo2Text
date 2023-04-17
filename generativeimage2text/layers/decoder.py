@@ -12,6 +12,7 @@ from .bert.modeling_bert import BertEncoder
 from .bert.xbert import BertEncoder as BertCrossAttEncoder
 from .predictor import TextGenerator
 
+
 class TextualHead(nn.Module):
     def __init__(self,
                  visual_feature_size: int, vocab_size: int, hidden_size: int):
@@ -563,6 +564,7 @@ class TransformerDecoderTextualHead(TextualHead):
         # caption_mask=None,
         encoder_history_states=None,
         return_dict=False,
+        text_feature=None,
     ):
         if return_dict:
             ret = {}
@@ -665,8 +667,6 @@ class ClassificationHead(nn.Module):
         x = self.dropout(x)
         x = self.out_proj(x)
         return x
-
-
 
 
 def convert2valid(shape, length=None, device='cuda'):
@@ -1148,8 +1148,6 @@ class CaptioningModel(nn.Module):
                 #self.prev_encoded_layers = None
                 logits = logits[0]
         return logits[:, -1, :].float()
-
-
 
 
 class GeneratorWithBeamSearch(object):

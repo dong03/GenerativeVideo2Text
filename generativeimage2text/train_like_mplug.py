@@ -226,8 +226,9 @@ def main(args, config):
 
     # tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
     model_name = config['model_name']
-    tokenizer = AutoTokenizer.from_pretrained('uer/gpt2-chinese-cluecorpussmall')
-    
+    tokenizer = AutoTokenizer.from_pretrained(
+        'uer/gpt2-chinese-cluecorpussmall')
+
     # tokenizer = ChineseCLIPProcessor.from_pretrained(
     #     "OFA-Sys/chinese-clip-vit-base-patch16")
     # tokenizer = tokenizer.tokenizer
@@ -240,10 +241,10 @@ def main(args, config):
     #     if 'textual' in key:
     #         del checkpoint[key]
     load_state_dict(model, checkpoint)
-    temp_encoder = GPT2Model.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
-    # temp_encoder = ChineseCLIPModel.from_pretrained(
-    #     "OFA-Sys/chinese-clip-vit-base-patch16").text_model
-    model.text_encoder = temp_encoder
+    # temp_encoder = GPT2Model.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
+    # # temp_encoder = ChineseCLIPModel.from_pretrained(
+    # #     "OFA-Sys/chinese-clip-vit-base-patch16").text_model
+    # model.text_encoder = temp_encoder
 
     if config['freeze'] == 'image':
         for n, p in model.named_parameters():

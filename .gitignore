@@ -17,7 +17,7 @@ output/*
 ckpt
 ckpt/*
 *.ipynb
-
+temp*
 # Mono auto generated files
 mono_crash.*
 

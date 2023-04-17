@@ -57,6 +57,7 @@ class TextGenerator(object):
     def __init__(self,
                  args,
                  model,
+                 text_encoder=None,
                  vocab=None,
                  symbols=None,
                  global_scorer=None,
@@ -70,6 +71,7 @@ class TextGenerator(object):
 
         self.args = args
         self.model = model
+        self.text_encoder = text_encoder
         # TODO  generator
         #self.generator = self.model.generator
         self.vocab = vocab
@@ -150,7 +152,8 @@ class TextGenerator(object):
         elif len(encoder_inputs) == 2:
             src_features, padding_mask = encoder_inputs
             input_ids = None
-
+        # import pdb
+        # pdb.set_trace()
         device = src_features.device
 
         # Tile states and memory beam_size times.
@@ -196,22 +199,35 @@ class TextGenerator(object):
         dec_position_ids = None
         caption_lengths = None
         for step in range(max_length):
-            dec_feat_seq = self.textual(
+            import pdb; pdb.set_trace()
+            caption_lengths = torch.ones_like(alive_seq)
+
+            if self.text_encoder is not None:
+                text_feature = self.text_encoder(alive_seq)
+                text_feature = text_feature.last_hidden_state
+            else:
+                text_feature = None
+
+            temp = self.model(
                 src_features,
                 alive_seq,
                 caption_lengths=caption_lengths,
                 hidden_valid_mask=None,
                 bi_valid_mask_caption=None,
                 encoder_history_states=None,
-                text_feature=None
+                text_feature=text_feature
             )
+            if type(temp) is tuple:
+                dec_feat_seq, cls = temp
+            else:
+                dec_feat_seq = temp
             # dec_feat_seq = self.model(alive_seq,
             #                              encoder_hidden_states = src_features,
             #                              encoder_attention_mask = attention_mask,
             #                              return_dict = True,
             #                              reduction = 'none')
 
-            dec_feat_seq = dec_feat_seq.logits[:, -1, :]
+            dec_feat_seq = dec_feat_seq[:, -1, :]
             vocab_size = dec_feat_seq.size(-1)
             log_probs = torch.log(torch.softmax(
                 dec_feat_seq.view(-1, vocab_size), dim=-1))
@@ -546,7 +562,7 @@ def tile(x, count, dim=0):
     out_size = list(x.size())
     out_size[0] *= count
     batch = x.size(0)
-    x = x.view(batch, -1) \
+    x = x.contiguous().view(batch, -1) \
          .transpose(0, 1) \
          .repeat(count, 1) \
          .transpose(0, 1) \

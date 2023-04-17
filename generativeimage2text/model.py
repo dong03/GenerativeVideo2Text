@@ -2,19 +2,20 @@ import torch
 try:
     from .torch_common import resize_2d_pos_embed
     from .layers.CLIP import clip
-    from .layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel
+    from .layers.decoder import CaptioningModel
     from .layers.decoder import (TransformerDecoderTextualHead,
-                                 TransformerDecoderClfTextualHead,
                                  AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
+    from .layers.dcb_decoder import CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel, TransformerDecoderClfTextualHead
+
 except:
     from torch_common import resize_2d_pos_embed
     from layers.CLIP import clip
-    from layers.decoder import CaptioningModel, CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel
+    from layers.decoder import CaptioningModel
     from layers.decoder import (TransformerDecoderTextualHead,
-                                TransformerDecoderClfTextualHead,
                                 AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
+    from layers.dcb_decoder import CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel, TransformerDecoderClfTextualHead
 
-from transformers import ChineseCLIPModel
+from transformers import ChineseCLIPModel, GPT2Model
 
 
 def get_git_model(tokenizer, param, dcb_param=None):
@@ -25,19 +26,30 @@ def get_git_model(tokenizer, param, dcb_param=None):
     if dcb_param is None:
         TEXT_DECODER = TransformerDecoderTextualHead
         CAP_MODEL = CaptioningModel
+        TEXT_ENCODER = None
     else:
         if dcb_param['vtm'] and dcb_param['dense']:
             TEXT_DECODER = TransformerDecoderClfTextualHead
             CAP_MODEL = CaptioningVTMDenseModel
+            # TEXT_ENCODER = None
+            TEXT_ENCODER = GPT2Model.from_pretrained(
+                "uer/gpt2-chinese-cluecorpussmall")
+            # TEXT_ENCODER = ChineseCLIPModel.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16").text_model
+
         elif not dcb_param['vtm'] and not dcb_param['dense']:
             TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningModel
+            TEXT_ENCODER = None
         elif not dcb_param['vtm']:
             TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningDenseModel
+            TEXT_ENCODER = None
         elif not dcb_param['dense']:
             TEXT_DECODER = TransformerDecoderClfTextualHead
             CAP_MODEL = CaptioningVTMModel
+            TEXT_ENCODER = GPT2Model.from_pretrained(
+                "uer/gpt2-chinese-cluecorpussmall")
+            # ChineseCLIPModel.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16").text_model
         else:
             raise NotImplementedError
     text_decoder = TEXT_DECODER(
@@ -78,6 +90,7 @@ def get_git_model(tokenizer, param, dcb_param=None):
         use_history_for_infer=True,
         loss_type='smooth',
         num_image_with_embedding=param.get('num_image_with_embedding'),
+        text_encoder=TEXT_ENCODER
     )
     return model
 

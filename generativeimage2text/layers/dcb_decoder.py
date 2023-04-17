@@ -13,6 +13,140 @@ from .bert.xbert import BertEncoder as BertCrossAttEncoder
 from .predictor import TextGenerator
 from .decoder import TransformerDecoderTextualHead, CaptioningModel, convert2valid, ClassificationHead, create_decoder, create_projecton_layer
 
+
+class BertEncoderAsDecoder(nn.Module):
+    def __init__(self, encoder, clf_flag=False):
+        super().__init__()
+        self.encoder = encoder
+        self.clf_flag = clf_flag
+
+    def forward(self, tgt, memory,
+                tgt_mask=None,
+                # memory_mask=None,
+                tgt_key_padding_mask=None,
+                memory_key_padding_mask=None,
+                tgt_bi_valid_mask=None,
+                encoder_history_states=None,
+                # tgt_bi_valid_mask: N x num_tgt
+                ):
+        assert tgt_key_padding_mask is None, 'not supported'
+        assert tgt_mask.dim() == 2
+        assert tgt_mask.shape[0] == tgt_mask.shape[1]
+        # tgt_mask should always be 0/negative infinity
+        # mask
+        tgt = tgt.transpose(0, 1)
+        memory = memory.transpose(0, 1)
+
+        hidden_states = torch.cat((memory, tgt), dim=1)
+        num_tgt = tgt.shape[1]
+        num_memory = memory.shape[1]
+        device = tgt.device
+        dtype = tgt.dtype
+        top_left = torch.zeros((num_memory, num_memory),
+                               device=device, dtype=dtype)
+        top_right = torch.full((num_memory, num_tgt), float(
+            '-inf'), device=tgt.device, dtype=dtype,)
+        # top_right[0] = torch.zeros(num_tgt, device=device, dtype=dtype)
+
+        bottom_left = torch.zeros(
+            (num_tgt, num_memory), dtype=dtype, device=tgt_mask.device,)
+
+        left = torch.cat((top_left, bottom_left), dim=0)
+        right = torch.cat((top_right, tgt_mask.to(dtype)), dim=0)
+
+        full_attention_mask = torch.cat((left, right), dim=1)[None, :]
+
+        if memory_key_padding_mask is None:
+            memory_key_padding_mask = torch.full(
+                (memory.shape[0], memory.shape[1]), fill_value=False, device=device)
+        # if it is False, it means valid. That is, it is not a padding
+        assert memory_key_padding_mask.dtype == torch.bool
+        zero_negative_infinity = torch.zeros_like(
+            memory_key_padding_mask, dtype=tgt.dtype)
+        zero_negative_infinity[memory_key_padding_mask] = float('-inf')
+        full_attention_mask = full_attention_mask.expand(
+            (memory_key_padding_mask.shape[0], num_memory + num_tgt, num_memory + num_tgt))
+        full_attention_mask = full_attention_mask.clone()
+        origin_left = full_attention_mask[:, :, :num_memory]
+        update = zero_negative_infinity[:, None, :]
+        full_attention_mask[:, :, :num_memory] = origin_left + update
+
+        if tgt_bi_valid_mask is not None:
+            # verify the correctness
+            bs = full_attention_mask.shape[0]
+            # during inference, tgt_bi_valid_mask's length is not changed, but
+            # num_tgt can be increased
+            max_valid_target = tgt_bi_valid_mask.shape[1]
+            mask = tgt_bi_valid_mask[:, None, :].expand(
+                (bs, num_memory+num_tgt, max_valid_target))
+            full_attention_mask[:, :, num_memory:(
+                num_memory+max_valid_target)][mask] = 0
+
+        # add axis for multi-head
+        full_attention_mask = full_attention_mask[:, None, :, :]
+        if encoder_history_states is None:
+            result = self.encoder(
+                hidden_states=hidden_states,
+                attention_mask=full_attention_mask,
+                encoder_history_states=encoder_history_states,
+            )
+            result = list(result)
+            cls_pos = result[0][:, -1]
+            result[0] = result[0][:, num_memory:].transpose(0, 1)
+            if self.encoder.output_hidden_states:
+                return result[0], result[1]
+            else:
+                if self.clf_flag:
+                    return result[0], cls_pos
+                else:
+                    # make it back-compatible
+                    return result[0]
+        else:
+            encoder_out = self.encoder(
+                hidden_states=hidden_states[:, -1:],
+                attention_mask=full_attention_mask[:, :, -1:],
+                encoder_history_states=encoder_history_states,
+            )
+            result = encoder_out[0].transpose(0, 1)
+            if self.encoder.output_hidden_states:
+                return result, encoder_out[1]
+            else:
+                return result
+
+
+def create_decoder(decoder_type, norm_type,
+                   textual_feature_size,
+                   attention_heads,
+                   feedforward_size,
+                   dropout,
+                   num_layers,
+                   output_hidden_states=False,
+                   use_mlp_wrapper=None,
+                   vocab_size=21128,
+                   cls_flag=False
+                   ):
+    assert norm_type in ['post', 'pre']
+    if decoder_type is None:
+        assert NotImplemented
+    elif decoder_type == 'bert_en':
+        config = BertConfig(
+            vocab_size_or_config_json_file=vocab_size,
+            hidden_size=textual_feature_size,
+            num_hidden_layers=num_layers,
+            num_attention_heads=attention_heads,
+            intermediate_size=feedforward_size,
+            hidden_act="gelu",
+            hidden_dropout_prob=0.1,
+            attention_probs_dropout_prob=0.1,
+            layer_norm_eps=1e-12,
+        )
+        config.pre_norm = (norm_type == 'pre')
+        config.use_mlp_wrapper = use_mlp_wrapper
+        config.output_hidden_states = output_hidden_states
+        encoder = BertEncoder(config)
+        return BertEncoderAsDecoder(encoder, cls_flag)
+
+
 class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
     def __init__(self, visual_feature_size: int, vocab_size: int, hidden_size: int, num_layers: int, attention_heads: int, feedforward_size: int, dropout: float = 0.1, norm_type: str = "post", mask_future_positions: bool = True, max_caption_length: int = 30, padding_idx: int = 0, decoder_type=None, visual_projection_type=None, not_tie_weight=None, output_hidden_states=None, use_mlp_wrapper=None, cosine_linear=False, ):
         super().__init__(visual_feature_size, vocab_size, hidden_size, num_layers, attention_heads, feedforward_size, dropout, norm_type, mask_future_positions,
@@ -154,11 +288,18 @@ class TransformerDecoderClfTextualHead(TransformerDecoderTextualHead):
                 return output_logits, cls_prob
 
 
-
 class CaptioningDenseModel(CaptioningModel):
-    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=0):
+    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=0, text_encoder=None):
         super().__init__(visual, textual, sos_index, eos_index, decoder, loss_type, context_not_share_embedding,
                          scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding)
+        predictor_config = {
+            'beam_size': 10,
+            'min_length': 15,
+            'max_length': 32,
+        }
+        self.beam_generator = TextGenerator(
+            args=predictor_config, model=self.textual)
+        self.text_encoder = text_encoder
         pass
 
     def forward_one(self, batch, return_info=False):
@@ -219,6 +360,57 @@ class CaptioningDenseModel(CaptioningModel):
             assert self.training and self.scst
             return self.forward_one_scst(batch, visual_features, visual_features_valid)
 
+    @torch.no_grad()
+    def infer(self, batch, visual_features, visual_features_valid,
+              search_param=None):
+        batch_size = visual_features.size(0)
+        if 'prefix' not in batch:
+            start_predictions = visual_features.new_full(
+                (batch_size, 1), self.sos_index
+            ).long()
+        else:
+            # if batch size is larger than 1, the prefix length could be
+            # different, and we have to padding non-valid data, which
+            # is not supported
+            assert len(batch['prefix']) == 1, 'not supported'
+            start_predictions = batch['prefix'].long()
+
+        self.prev_encoded_layers = None
+        # Add image features as a default argument to match callable
+        # signature accepted by beam search class (partial captions only).
+        padding_mask = torch.ones_like(
+            visual_features[:, :, 0]).long()
+
+        predictor_inputs = [visual_features, padding_mask, start_predictions]
+        topk_ids, topk_probs = self.beam_generator.translate_batch_scst(
+            predictor_inputs, out_size=1)
+        output_dict = {
+            'predictions': topk_ids,
+            'logprobs': topk_probs,
+        }
+        return output_dict
+
+        decoding_step = functools.partial(
+            self.decoding_step, visual_features, visual_features_valid,
+            batch.get('bi_valid_mask_caption')
+        )
+
+        search_param = search_param or {}
+        # the start_predictions are not in predicted_caption
+        predicted_caption, logprobs = self.decoder.search(
+            start_predictions, decoding_step, **search_param
+        )
+        # pdb.set_trace()
+        if 'prefix' in batch:
+            # we need to remove prefix from predicted_caption
+            predicted_caption = predicted_caption[:,
+                                                  start_predictions.shape[1]:]
+        output_dict = {
+            'predictions': predicted_caption,
+            'logprobs': logprobs,
+        }
+        return output_dict
+
 
 class CaptioningVTMModel(CaptioningModel):
     def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=6, text_encoder=None):
@@ -226,6 +418,13 @@ class CaptioningVTMModel(CaptioningModel):
                          scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding)
         self.vtm_loss = nn.CrossEntropyLoss()
         self.text_encoder = text_encoder
+        predictor_config = {
+            'beam_size': 10,
+            'min_length': 15,
+            'max_length': 32,
+        }
+        self.beam_generator = TextGenerator(
+            args=predictor_config, model=self.textual, text_encoder=self.text_encoder)
 
     @torch.no_grad()
     def infer_vtm(self, visual_features, caption_token_input, visual_features_valid, batch):
@@ -355,10 +554,12 @@ class CaptioningVTMModel(CaptioningModel):
     def infer(self, batch, visual_features, visual_features_valid,
               search_param=None):
         batch_size = visual_features.size(0)
+
         if 'prefix' not in batch:
             start_predictions = visual_features.new_full(
                 (batch_size, 1), self.sos_index
             ).long()
+            # start_predictions = torch.tensor([101, 6228, 7574, 3227, 4850]).repeat(batch_size, 1).long().to(visual_features.device)
         else:
             # if batch size is larger than 1, the prefix length could be
             # different, and we have to padding non-valid data, which
@@ -367,6 +568,17 @@ class CaptioningVTMModel(CaptioningModel):
             start_predictions = batch['prefix'].long()
 
         self.prev_encoded_layers = None
+        padding_mask = torch.ones_like(
+            visual_features[:, :, 0]).long()
+
+        predictor_inputs = [visual_features, padding_mask, start_predictions]
+        topk_ids, topk_probs = self.beam_generator.translate_batch_scst(
+            predictor_inputs, out_size=1)
+        output_dict = {
+            'predictions': topk_ids,
+            'logprobs': topk_probs,
+        }
+        return output_dict
         # Add image features as a default argument to match callable
         # signature accepted by beam search class (partial captions only).
         decoding_step = functools.partial(
