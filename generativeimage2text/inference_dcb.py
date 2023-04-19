@@ -252,12 +252,12 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id, ckpt=None):
     input_ids = [tokenizer.cls_token_id] + payload
     prefix = torch.tensor(input_ids).unsqueeze(0).to(device)
     root = '/data/dcb/bv/FrameWithTextData'
-    file = '/home/dcb/code/bv/captioning/cmo/BV_0321_videopath.txt'
+    file = '/home/dcb/code/bv/captioning/cmo/BV_0417_videopath.txt'
     # file = '/home/dcb/code/bv/captioning/bvcap_test_cap.txt'
     videos = open(file, encoding='utf-8').readlines()
     videos = [each.strip().split('\t')[0] for each in videos]
     name_plus = os.path.split(ckpt)[-1] if ckpt else ''
-    with open(f'{model_name}_{name_plus}_cmo.txt', 'w') as f:
+    with open(f'{model_name}_{name_plus}_BV_0417.txt', 'w') as f:
         for ix, bv in enumerate(tqdm(videos)):
             try:
                 # import pdb; pdb.set_trace()
