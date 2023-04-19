@@ -89,13 +89,13 @@ def load_model_state_ignore_mismatch(model, init_dict):
             unique_key_in_init_dict.append(k)
             num_ignored = num_ignored + 1
 
-    # logging.info('unique keys in init dict = {}; total = {}'.format(
-    #     pformat(unique_key_in_init_dict), len(unique_key_in_init_dict),
-    # ))
+    logging.info('unique keys in init dict = {}; total = {}'.format(
+        pformat(unique_key_in_init_dict), len(unique_key_in_init_dict),
+    ))
     result = model.load_state_dict(real_init_dict, strict=False)
-    # logging.info('unique key (not initialized) in current model = {}'.format(
-    #     pformat(result.missing_keys),
-    # ))
+    logging.info('unique key (not initialized) in current model = {}'.format(
+        pformat(result.missing_keys),
+    ))
 
     # logging.info('loaded key = {}'.format(
     # pformat(list(real_init_dict.keys()))))

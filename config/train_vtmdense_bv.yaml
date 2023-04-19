@@ -1,33 +1,35 @@
 dataset_name: 'BV'
-train_root: '/data/dcb/bv/FrameWithTextData'
+train_root: '/data/caz/VisualSearch/B52/Videos'
 train_file: '/home/dcb/code/bv/CNXCLIP/dataset/train_bv.txt'
-val_root: '/data/dcb/bv/FrameWithTextData'
+val_root: '/data/caz/VisualSearch/B52/Videos'
 val_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
 
-test_root: '/data/dcb/bv/FrameWithTextData'
-test_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
+test_root: '/data/caz/VisualSearch/B52/Videos'
+test_file: '/home/dcb/code/bv/git_aimc/data/BV_0321_caption.txt'
+
 
 freeze: 'image'
 read_local_data: True
 
 model_name: 'GIT_BASE_VATEX'
+vtm: True
+dense: True
 image_res: 224
-batch_size_train: 8
+batch_size_train: 16
 vision_width: 1024
 batch_size_test: 8
 k_test: 128
-num_frm_test: 4
-vtm: False
-dense: False
+num_frm_test: 64
+
 alpha: 0.4
 warm_up: True
 
 
-optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 5.0e-6, weight_decay: 0.02 }
+optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 1.0e-5, weight_decay: 0.02 }
 schedular:
   {
     sched: cosine,
-    lr: 1.0e-4,
+    lr: 1.0e-5,
     epochs: 8,
     min_lr: 1.0e-6,
     decay_rate: 1,

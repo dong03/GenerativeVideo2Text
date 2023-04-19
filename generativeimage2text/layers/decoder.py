@@ -5,6 +5,12 @@ import logging
 from torch import nn
 from pprint import pformat
 import functools
+import random
+import pdb
+from .bert import BertConfig
+from .bert.modeling_bert import BertEncoder
+from .bert.xbert import BertEncoder as BertCrossAttEncoder
+from .predictor import TextGenerator
 
 
 class TextualHead(nn.Module):
@@ -94,9 +100,10 @@ class WordAndPositionalEmbedding(nn.Module):
 
 
 class BertEncoderAsDecoder(nn.Module):
-    def __init__(self, encoder):
+    def __init__(self, encoder, clf_flag=False):
         super().__init__()
         self.encoder = encoder
+        self.clf_flag = clf_flag
 
     def forward(self, tgt, memory,
                 tgt_mask=None,
@@ -126,6 +133,7 @@ class BertEncoderAsDecoder(nn.Module):
             '-inf'), device=tgt.device, dtype=dtype,)
         bottom_left = torch.zeros(
             (num_tgt, num_memory), dtype=dtype, device=tgt_mask.device,)
+
         left = torch.cat((top_left, bottom_left), dim=0)
         right = torch.cat((top_right, tgt_mask.to(dtype)), dim=0)
 
@@ -159,7 +167,6 @@ class BertEncoderAsDecoder(nn.Module):
 
         # add axis for multi-head
         full_attention_mask = full_attention_mask[:, None, :, :]
-
         if encoder_history_states is None:
             result = self.encoder(
                 hidden_states=hidden_states,
@@ -167,12 +174,16 @@ class BertEncoderAsDecoder(nn.Module):
                 encoder_history_states=encoder_history_states,
             )
             result = list(result)
+            cls_pos = result[0][:, num_memory]
             result[0] = result[0][:, num_memory:].transpose(0, 1)
             if self.encoder.output_hidden_states:
                 return result[0], result[1]
             else:
-                # make it back-compatible
-                return result[0]
+                if self.clf_flag:
+                    return result[0], cls_pos
+                else:
+                    # make it back-compatible
+                    return result[0]
         else:
             encoder_out = self.encoder(
                 hidden_states=hidden_states[:, -1:],
@@ -194,14 +205,13 @@ def create_decoder(decoder_type, norm_type,
                    num_layers,
                    output_hidden_states=False,
                    use_mlp_wrapper=None,
-                   vocab_size=21128
+                   vocab_size=21128,
+                   cls_flag=False
                    ):
     assert norm_type in ['post', 'pre']
     if decoder_type is None:
         assert NotImplemented
     elif decoder_type == 'bert_en':
-        from .bert import BertConfig
-        from .bert.modeling_bert import BertEncoder
         config = BertConfig(
             vocab_size_or_config_json_file=vocab_size,
             hidden_size=textual_feature_size,
@@ -217,7 +227,7 @@ def create_decoder(decoder_type, norm_type,
         config.use_mlp_wrapper = use_mlp_wrapper
         config.output_hidden_states = output_hidden_states
         encoder = BertEncoder(config)
-        return BertEncoderAsDecoder(encoder)
+        return BertEncoderAsDecoder(encoder, cls_flag)
 
 
 class AutoRegressiveBeamSearch(object):
@@ -554,6 +564,7 @@ class TransformerDecoderTextualHead(TextualHead):
         # caption_mask=None,
         encoder_history_states=None,
         return_dict=False,
+        text_feature=None,
     ):
         if return_dict:
             ret = {}
@@ -637,6 +648,25 @@ class TransformerDecoderTextualHead(TextualHead):
         )
         mask = mask.masked_fill(mask == 1, float("-inf"))
         return mask
+
+
+class ClassificationHead(nn.Module):
+    """Head for sentence-level classification tasks."""
+
+    def __init__(self, classifier_dropout=0.2, hidden_size=768, num_labels=2):
+        super().__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.out_proj = nn.Linear(hidden_size, num_labels)
+
+    def forward(self, x, **kwargs):
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
 
 
 def convert2valid(shape, length=None, device='cuda'):
@@ -1032,6 +1062,7 @@ class CaptioningModel(nn.Module):
                 batch, visual_features, visual_features_valid)
         return output_dict
 
+    @torch.no_grad()
     def infer(self, batch, visual_features, visual_features_valid,
               search_param=None):
         batch_size = visual_features.size(0)
@@ -1094,7 +1125,8 @@ class CaptioningModel(nn.Module):
             partial_captions = partial_captions.unsqueeze(1)
 
         # shape: (batch_size * beam_size, partial_caption_length, vocab_size)
-        logits = self.textual(
+
+        temp = self.textual(
             visual_features,
             partial_captions,
             caption_lengths=caption_lengths,
@@ -1102,6 +1134,10 @@ class CaptioningModel(nn.Module):
             bi_valid_mask_caption=bi_valid_mask_caption,
             encoder_history_states=self.prev_encoded_layers,
         )
+        if type(temp) is tuple:
+            logits = temp[0]
+        else:
+            logits = temp
         if self.scst or self.use_history_for_infer:
             if isinstance(logits, tuple) and len(logits) == 2:
                 if self.prev_encoded_layers is None:

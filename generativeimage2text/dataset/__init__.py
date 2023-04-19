@@ -4,7 +4,7 @@ from torchvision import transforms
 from PIL import Image
 
 
-from dataset.video_dataset_dcb import dcb_video_caps_dataset, dcb_images_caps_dataset
+from dataset.video_dataset_dcb import dcb_video_caps_dataset, dcb_images_caps_dataset, dense_frames_caps_dataset
 
 from dataset.randaugment import RandomAugment
 
@@ -35,12 +35,22 @@ def create_dataset(dataset, config, epoch=None):
                                               is_train=False, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform')
         return test_dataset
     elif dataset == 'dcb_frames_caps':
-        train_dataset = dcb_images_caps_dataset(config['train_file'], config['train_root'], max_words=config['max_length'], read_local_data=config['read_local_data'],
-                                                is_train=True, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform', transform=train_transform)
+        FRAME_DATASET = dense_frames_caps_dataset if config['dense'] else dcb_images_caps_dataset
+        train_dataset = FRAME_DATASET(config['train_file'],
+                                      config['train_root'],
+                                      max_words=config['max_length'],
+                                      read_local_data=config['read_local_data'],
+                                      is_train=True,
+                                      num_frm=config['num_frm_test'],
+                                      max_img_size=config['image_res'],
+                                      frm_sampling_strategy='uniform',
+                                      transform=train_transform)
 
-        val_dataset = dcb_images_caps_dataset(config['val_file'], config['val_root'], max_words=config['max_length'], read_local_data=config['read_local_data'],
-                                              is_train=False, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform', transform=test_transform)
-        return train_dataset, val_dataset, val_dataset
+        val_dataset = FRAME_DATASET(config['val_file'], config['val_root'], max_words=config['max_length'], read_local_data=config['read_local_data'],
+                                    is_train=False, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform', transform=test_transform)
+        test_dataset = FRAME_DATASET(config['test_file'], config['test_root'], max_words=config['max_length'], read_local_data=config['read_local_data'],
+                                     is_train=False, num_frm=config['num_frm_test'], max_img_size=config['image_res'], frm_sampling_strategy='uniform', transform=test_transform)
+        return train_dataset, val_dataset, test_dataset
 
 
 def cap_collate_fn(batch):
