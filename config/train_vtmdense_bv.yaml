@@ -1,11 +1,11 @@
 dataset_name: 'BV'
 train_root: '/data/caz/VisualSearch/B52/Videos'
-train_file: '/home/dcb/code/bv/CNXCLIP/dataset/train_bv.txt'
+train_file: '/home/dcb/code/bv/git_aimc/data/train_bvcap_captitle.txt'
 val_root: '/data/caz/VisualSearch/B52/Videos'
-val_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
+val_file: '/home/dcb/code/bv/git_aimc/data/val_bvcap_captitle_pro.txt'
 
 test_root: '/data/caz/VisualSearch/B52/Videos'
-test_file: '/home/dcb/code/bv/git_aimc/data/BV_0321_caption.txt'
+test_file: '/home/dcb/code/bv/git_aimc/data/BV_0417_caption_cn.txt'
 
 
 freeze: 'image'
