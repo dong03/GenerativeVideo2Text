@@ -5,7 +5,7 @@ try:
     from .layers.decoder import CaptioningModel
     from .layers.decoder import (TransformerDecoderTextualHead,
                                  AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
-    from .layers.dcb_decoder import CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel, TransformerDecoderClfTextualHead
+    from .layers.dcb_decoder import CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel, CaptioningSparseModel, CaptioningVTMSparseModel, TransformerDecoderClfTextualHead
 
 except:
     from torch_common import resize_2d_pos_embed
@@ -13,7 +13,7 @@ except:
     from layers.decoder import CaptioningModel
     from layers.decoder import (TransformerDecoderTextualHead,
                                 AutoRegressiveBeamSearch, GeneratorWithBeamSearch)
-    from layers.dcb_decoder import CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel, TransformerDecoderClfTextualHead
+    from layers.dcb_decoder import CaptioningVTMModel, CaptioningDenseModel, CaptioningVTMDenseModel, CaptioningSparseModel, CaptioningVTMSparseModel, TransformerDecoderClfTextualHead
 
 from transformers import ChineseCLIPModel, GPT2Model
 
@@ -35,11 +35,15 @@ def get_git_model(tokenizer, param, dcb_param=None):
             # TEXT_ENCODER = GPT2Model.from_pretrained(
             #     "uer/gpt2-chinese-cluecorpussmall")
             # TEXT_ENCODER = ChineseCLIPModel.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16").text_model
-
-        elif not dcb_param['vtm'] and not dcb_param['dense']:
+        elif dcb_param['vtm'] and dcb_param['sparse']:
+            TEXT_DECODER = TransformerDecoderClfTextualHead
+            CAP_MODEL = CaptioningVTMSparseModel
+            TEXT_ENCODER = None
+        elif not dcb_param['vtm'] and not dcb_param['dense'] and not dcb_param['sparse']:
             TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningModel
             TEXT_ENCODER = None
+        # not sure, may be need to be delated
         elif not dcb_param['vtm']:
             TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningDenseModel

@@ -414,6 +414,138 @@ class CaptioningDenseModel(CaptioningModel):
         return output_dict
 
 
+class CaptioningSparseModel(CaptioningModel):
+    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=0, text_encoder=None):
+        super().__init__(visual, textual, sos_index, eos_index, decoder, loss_type, context_not_share_embedding,
+                         scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding)
+        # predictor_config = {
+        #     'beam_size': 10,
+        #     'min_length': 15,
+        #     'max_length': 32,
+        # }
+        # self.beam_generator = TextGenerator(
+        #     args=predictor_config, model=self.textual)
+        self.text_encoder = text_encoder
+        pass
+
+    def forward_one(self, batch, return_info=False):
+        # shape: (batch_size, max_caption_length, vocab_size)
+        if 'image' in batch:
+            #BZ * frame * 3 * 160 * 160
+            try:
+                input = batch['image'].reshape(-1, batch['image'].shape[-3],
+                                               batch['image'].shape[-2], batch['image'].shape[-1])
+                features = self.image_encoder(input)
+                bz = features.shape[0]
+                corse_features = features[:, 0, :]
+                fine_features = features[bz//2]
+
+                import pdb
+                pdb.set_trace()
+                features = features[:, 0, :]
+                features = features.reshape(
+                    batch['image'].shape[0], batch['image'].shape[1], -1)
+                # features = features.reshape(
+                #     batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1])
+                # if self.num_image_with_embedding:
+                #     for i in range(self.num_image_with_embedding):
+                #         features[:, i] += self.img_temperal_embedding[i]
+
+                if self.pooling_images == 'avg':
+                    visual_features = torch.mean(features, dim=1)
+                elif self.pooling_images is None:
+                    visual_features = features.reshape(
+                        features.shape[0], -1, 768)
+            except:
+                if isinstance(batch['image'], (list, tuple)):
+                    features = [self.image_encoder(im)
+                                for im in batch['image']]
+                    if self.num_image_with_embedding:
+                        features = [
+                            f + e for f, e in zip(features, self.img_temperal_embedding)]
+                    if self.pooling_images is None:
+                        visual_features = torch.cat(features, dim=1)
+                    elif self.pooling_images == 'avg':
+                        visual_features = torch.stack(
+                            features, dim=1).mean(dim=1)
+                    else:
+                        raise NotImplementedError
+                else:
+                    visual_features = self.image_encoder(batch['image'])
+        else:
+            visual_features = None
+        visual_features_valid = None
+        if 'context' in batch:
+            context_embedding = self.context_embedding if self.context_not_share_embedding else self.textual.embedding
+            all_context = [visual_features]
+            all_valid = [convert2valid(visual_features.shape[:2])]
+            for info in batch['context']:
+                context = context_embedding(info['tokens'])
+                valid = convert2valid(info['tokens'].shape, info['length'])
+                all_context.append(context)
+                all_valid.append(valid)
+            visual_features = torch.cat(all_context, dim=1)
+            visual_features_valid = torch.cat(all_valid, dim=1)
+        if not self.training or (not self.scst):
+            return self.forward_one_ce(batch, visual_features, visual_features_valid, return_info)
+        else:
+            assert self.training and self.scst
+            return self.forward_one_scst(batch, visual_features, visual_features_valid)
+
+    @torch.no_grad()
+    def infer(self, batch, visual_features, visual_features_valid,
+              search_param=None):
+        batch_size = visual_features.size(0)
+        if 'prefix' not in batch:
+            start_predictions = visual_features.new_full(
+                (batch_size, 1), self.sos_index
+            ).long()
+        else:
+            # if batch size is larger than 1, the prefix length could be
+            # different, and we have to padding non-valid data, which
+            # is not supported
+            assert len(batch['prefix']) == 1, 'not supported'
+            start_predictions = batch['prefix'].long()
+
+        self.prev_encoded_layers = None
+        # Add image features as a default argument to match callable
+        # signature accepted by beam search class (partial captions only).
+        '''
+        padding_mask = torch.ones_like(
+            visual_features[:, :, 0]).long()
+
+        predictor_inputs = [visual_features, padding_mask, start_predictions]
+        topk_ids, topk_probs = self.beam_generator.translate_batch_scst(
+            predictor_inputs, out_size=1)
+        output_dict = {
+            'predictions': topk_ids,
+            'logprobs': topk_probs,
+        }
+        return output_dict
+        '''
+
+        decoding_step = functools.partial(
+            self.decoding_step, visual_features, visual_features_valid,
+            batch.get('bi_valid_mask_caption')
+        )
+
+        search_param = search_param or {}
+        # the start_predictions are not in predicted_caption
+        predicted_caption, logprobs = self.decoder.search(
+            start_predictions, decoding_step, **search_param
+        )
+        # pdb.set_trace()
+        if 'prefix' in batch:
+            # we need to remove prefix from predicted_caption
+            predicted_caption = predicted_caption[:,
+                                                  start_predictions.shape[1]:]
+        output_dict = {
+            'predictions': predicted_caption,
+            'logprobs': logprobs,
+        }
+        return output_dict
+
+
 class CaptioningVTMModel(CaptioningModel):
     def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=6, text_encoder=None):
         super().__init__(visual, textual, sos_index, eos_index, decoder, loss_type, context_not_share_embedding,
@@ -569,7 +701,7 @@ class CaptioningVTMModel(CaptioningModel):
             assert len(batch['prefix']) == 1, 'not supported'
             start_predictions = batch['prefix'].long()
         self.prev_encoded_layers = None
-        
+
         '''
         padding_mask = torch.ones_like(
             visual_features[:, :, 0]).long()
@@ -688,6 +820,82 @@ class CaptioningVTMDenseModel(CaptioningVTMModel):
                 features = features[:, 0, :]
                 features = features.reshape(
                     batch['image'].shape[0], batch['image'].shape[1], -1)
+                # features = features.reshape(
+                #     batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1])
+                # if self.num_image_with_embedding:
+                #     for i in range(self.num_image_with_embedding):
+                #         features[:, i] += self.img_temperal_embedding[i]
+
+                if self.pooling_images == 'avg':
+                    visual_features = torch.mean(features, dim=1)
+                elif self.pooling_images is None:
+                    visual_features = features.reshape(
+                        features.shape[0], -1, 768)
+            except:
+                if isinstance(batch['image'], (list, tuple)):
+                    features = [self.image_encoder(im)
+                                for im in batch['image']]
+                    if self.num_image_with_embedding:
+                        features = [
+                            f + e for f, e in zip(features, self.img_temperal_embedding)]
+                    if self.pooling_images is None:
+                        visual_features = torch.cat(features, dim=1)
+                    elif self.pooling_images == 'avg':
+                        visual_features = torch.stack(
+                            features, dim=1).mean(dim=1)
+                    else:
+                        raise NotImplementedError
+                else:
+                    visual_features = self.image_encoder(batch['image'])
+        else:
+            visual_features = None
+        visual_features_valid = None
+        if 'context' in batch:
+            context_embedding = self.context_embedding if self.context_not_share_embedding else self.textual.embedding
+            all_context = [visual_features]
+            all_valid = [convert2valid(visual_features.shape[:2])]
+            for info in batch['context']:
+                context = context_embedding(info['tokens'])
+                valid = convert2valid(info['tokens'].shape, info['length'])
+                all_context.append(context)
+                all_valid.append(valid)
+            visual_features = torch.cat(all_context, dim=1)
+            visual_features_valid = torch.cat(all_valid, dim=1)
+        if not self.training or (not self.scst):
+            return self.forward_one_ce(batch, visual_features, visual_features_valid, return_info)
+        else:
+            assert self.training and self.scst
+            return self.forward_one_scst(batch, visual_features, visual_features_valid)
+
+
+class CaptioningVTMSparseModel(CaptioningVTMModel):
+    def __init__(self, visual, textual, sos_index=1, eos_index=2, decoder=None, loss_type=None, context_not_share_embedding=False, scst=False, tokenizer=None, scst_temperature=1, use_history_for_infer=False, pooling_images=None, num_image_with_embedding=6, text_encoder=None):
+        super().__init__(visual, textual, sos_index, eos_index, decoder, loss_type, context_not_share_embedding,
+                         scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding,
+                         text_encoder)
+
+        self.vtm_loss = nn.CrossEntropyLoss()
+
+    def forward_one(self, batch, return_info=False):
+        # shape: (batch_size, max_caption_length, vocab_size)
+        if 'image' in batch:
+            #BZ * frame * 3 * 160 * 160
+            try:
+                input = batch['image'].reshape(-1, batch['image'].shape[-3],
+                                               batch['image'].shape[-2], batch['image'].shape[-1])
+                features = self.image_encoder(input)
+                bz,num_frame = batch['image'].shape[:2]
+                
+                corse_features = features[:, 0, :].reshape(
+                    batch['image'].shape[0], batch['image'].shape[1], -1)
+                fine_features = features[[num_frame // 2+ num_frame *i for i in range(bz)]]
+                
+                features = torch.cat([corse_features, fine_features], dim=1)
+                # import pdb
+                # pdb.set_trace()
+                # features = features[:, 0, :]
+                # features = features.reshape(
+                #     batch['image'].shape[0], batch['image'].shape[1], -1)
                 # features = features.reshape(
                 #     batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1])
                 # if self.num_image_with_embedding:
