@@ -6,7 +6,7 @@ from scheduler import create_scheduler
 from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
 from dataset.utils import save_result
 import utils
-from transformers import ChineseCLIPProcessor, ChineseCLIPModel
+from transformers import ChineseCLIPProcessor, ChineseCLIPModel, AutoTokenizer
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 import torch
@@ -23,6 +23,7 @@ import argparse
 import matplotlib
 from apex import amp
 import apex
+from tqdm import tqdm
 matplotlib.use('Agg')
 
 
@@ -39,11 +40,54 @@ def evaluation(model, data_loader, tokenizer, device, config):
 
     answer_input = None
     for n, (image, image_names, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        if n == 5:
+            break
         image = image.to(device, non_blocking=True)
 
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
         from tqdm import tqdm
+        for i in tqdm(range(len(image_names))):
+            input_data = {
+                'image': image[i:i+1],
+                'need_predict': caption['attention_mask'][i:i+1],
+                'caption_tokens': caption['input_ids'][i:i+1],
+            }
+            result = model(input_data)
+            cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
+        # for i in range(result['predictions'].shape[0]):
+            cap = tokenizer.decode(
+                result['predictions'][0],
+                skip_special_tokens=True)
+            cap = cap.replace(
+                "[CLS]", "").replace("[PAD]", "").strip()
+            ral_val.append({
+                "question_id": image_names[i],
+                "pred_caption": cap,
+                "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
+                "vtm_score": cls_prob[0, 1].item()})
+    return ral_val
+
+@torch.no_grad()
+def evaluation_mplugdecoder(model, data_loader, tokenizer, device, config):
+    # test
+    model.eval()
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = 'Generate caption test result:'
+    print_freq = 5
+
+    ral_val = []
+
+    answer_input = None
+    for n, (image, image_names, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        if n == 5:
+            break
+        image = image.to(device, non_blocking=True)
+
+        caption = tokenizer(caption, padding='longest', truncation=True,
+                            max_length=args.max_input_length, return_tensors="pt").to(device)
+        
         input_data = {
             'image': image,
             'need_predict': caption['attention_mask'],
@@ -52,16 +96,6 @@ def evaluation(model, data_loader, tokenizer, device, config):
         result = model(input_data)
         cls_prob = result.get('cls_prob', torch.zeros((image.shape[0], 2)))
 
-        # for i in tqdm(range(len(image_names))):
-        #     input_data = {
-        #         'image': image[i:i+1],
-        #         'need_predict': caption['attention_mask'][i:i+1],
-        #         'caption_tokens': caption['input_ids'][i:i+1],
-        #     }
-        #     result = model(input_data)
-        #     cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
-        # import pdb
-        # pdb.set_trace()
         for i in range(len(result['predictions'])):
             cap = tokenizer.decode(
                 result['predictions'][i][0],
@@ -73,17 +107,6 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
                 "vtm_score": cls_prob[i, 1].item()})
-
-            # import pdb
-            # pdb.set_trace()
-        # import
-        # for image_id, topk_id, topk_prob, gold_caption_list in zip(image_names, topk_ids, topk_probs, caption['input_ids']):
-        #     ans = tokenizer.decode(topk_id[0]).replace("[SEP]", "").replace(
-        #         "[CLS]", "").replace("[PAD]", "").strip()
-        #     result.append({
-        #         "question_id": image_id,
-        #         "pred_caption": ans,
-        #         "gold_caption": tokenizer.decode(gold_caption_list).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip()})
 
     return ral_val
 
@@ -120,9 +143,10 @@ def main(args, config):
                                       collate_fns=[cap_collate_fn, cap_collate_fn, cap_collate_fn])
 
     # tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
-    tokenizer = ChineseCLIPProcessor.from_pretrained(
-        "OFA-Sys/chinese-clip-vit-base-patch16")
-    tokenizer = tokenizer.tokenizer
+    # tokenizer = ChineseCLIPProcessor.from_pretrained(
+    #     "OFA-Sys/chinese-clip-vit-base-patch16")
+    # tokenizer = tokenizer.tokenizer
+    tokenizer = AutoTokenizer.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
     model = get_git_model(tokenizer, {}, config)
 
     checkpoint = torch.load(args.checkpoint, map_location='cpu')['model']

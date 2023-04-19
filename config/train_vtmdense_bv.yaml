@@ -1,17 +1,16 @@
-dataset_name: 'BV'
-train_root: '/data/caz/VisualSearch/B52/Videos'
-train_file: '/home/dcb/code/bv/git_aimc/data/train_bvcap_captitle.txt'
-val_root: '/data/caz/VisualSearch/B52/Videos'
-val_file: '/home/dcb/code/bv/git_aimc/data/val_bvcap_captitle_pro.txt'
+dataset_name: "BV"
+train_root: "../VisualSearch/BV_Video"
+train_file: "../data/train_bvcap_captitle.txt"
+val_root: "../VisualSearch/BV_Video"
+val_file: "../data/val_bvcap_captitle_pro.txt"
 
-test_root: '/data/caz/VisualSearch/B52/Videos'
-test_file: '/home/dcb/code/bv/git_aimc/data/BV_0417_caption_cn.txt'
+test_root: "../VisualSearch/BV_Video"
+test_file: "../data/BV_0417_caption_cn.txt"
 
-
-freeze: 'image'
+freeze: "image"
 read_local_data: True
 
-model_name: 'GIT_BASE_VATEX'
+model_name: "GIT_BASE_VATEX"
 vtm: True
 dense: True
 image_res: 224
@@ -23,7 +22,6 @@ num_frm_test: 64
 
 alpha: 0.4
 warm_up: True
-
 
 optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 1.0e-5, weight_decay: 0.02 }
 schedular:
@@ -38,5 +36,3 @@ schedular:
     cooldown_epochs: 0,
   }
 use_checkpoint: true
-
-

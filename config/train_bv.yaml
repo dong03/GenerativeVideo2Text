@@ -1,10 +1,10 @@
 dataset_name: 'BV'
-train_root: '/data/dcb/bv/FrameWithTextData'
+train_root: '../VisualSearch/BV_Frame'
 train_file: '/home/dcb/code/bv/CNXCLIP/dataset/train_bv.txt'
-val_root: '/data/dcb/bv/FrameWithTextData'
+val_root: '../VisualSearch/BV_Frame'
 val_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
 
-test_root: '/data/dcb/bv/FrameWithTextData'
+test_root: '../VisualSearch/BV_Frame'
 test_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
 
 freeze: 'image'

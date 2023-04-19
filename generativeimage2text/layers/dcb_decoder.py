@@ -568,8 +568,9 @@ class CaptioningVTMModel(CaptioningModel):
             # different, and we have to padding non-valid data, which is not supported
             assert len(batch['prefix']) == 1, 'not supported'
             start_predictions = batch['prefix'].long()
-        '''
         self.prev_encoded_layers = None
+        
+        '''
         padding_mask = torch.ones_like(
             visual_features[:, :, 0]).long()
 

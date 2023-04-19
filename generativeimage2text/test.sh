@@ -8,9 +8,9 @@
 #     --max_input_length 48
 
 TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python infer_like_mplug.py \
-    --config /home/dcb/code/bv/git_aimc/config/train_vtmdense_bv.yaml \
-    --output_dir /home/dcb/code/bv/git_aimc/ckpt/results/ \
-    --checkpoint /home/dcb/code/bv/git_aimc/output/git_densevtmbv.pth \
+    --config ../config/train_vtmdense_bv.yaml \
+    --output_dir ../ckpt/results/ \
+    --checkpoint ../output/GIT_VTMDense_firstnoencoder.pth \
     --min_length 15 \
     --beam_size 10 \
     --max_length 32 \
