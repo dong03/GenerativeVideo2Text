@@ -73,8 +73,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
                 "vtm_score": cls_prob[i, 1].item()})
-        if n:
-            break
+
             # import pdb
             # pdb.set_trace()
         # import
@@ -125,7 +124,6 @@ def main(args, config):
         "OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = tokenizer.tokenizer
     model = get_git_model(tokenizer, {}, config)
-
 
     checkpoint = torch.load(args.checkpoint, map_location='cpu')['model']
     # model.load_state_dict(checkpoint)

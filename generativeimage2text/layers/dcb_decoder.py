@@ -46,7 +46,7 @@ class BertEncoderAsDecoder(nn.Module):
                                device=device, dtype=dtype)
         top_right = torch.full((num_memory, num_tgt), float(
             '-inf'), device=tgt.device, dtype=dtype,)
-        # top_right[0] = torch.zeros(num_tgt, device=device, dtype=dtype)
+        top_right[0] = torch.zeros(num_tgt, device=device, dtype=dtype)
 
         bottom_left = torch.zeros(
             (num_tgt, num_memory), dtype=dtype, device=tgt_mask.device,)
@@ -91,7 +91,7 @@ class BertEncoderAsDecoder(nn.Module):
                 encoder_history_states=encoder_history_states,
             )
             result = list(result)
-            cls_pos = result[0][:, -1]
+            cls_pos = result[0][:, 0]
             result[0] = result[0][:, num_memory:].transpose(0, 1)
             if self.encoder.output_hidden_states:
                 return result[0], result[1]
@@ -378,6 +378,7 @@ class CaptioningDenseModel(CaptioningModel):
         self.prev_encoded_layers = None
         # Add image features as a default argument to match callable
         # signature accepted by beam search class (partial captions only).
+        '''
         padding_mask = torch.ones_like(
             visual_features[:, :, 0]).long()
 
@@ -389,6 +390,7 @@ class CaptioningDenseModel(CaptioningModel):
             'logprobs': topk_probs,
         }
         return output_dict
+        '''
 
         decoding_step = functools.partial(
             self.decoding_step, visual_features, visual_features_valid,
@@ -418,6 +420,7 @@ class CaptioningVTMModel(CaptioningModel):
                          scst, tokenizer, scst_temperature, use_history_for_infer, pooling_images, num_image_with_embedding)
         self.vtm_loss = nn.CrossEntropyLoss()
         self.text_encoder = text_encoder
+        '''
         predictor_config = {
             'beam_size': 10,
             'min_length': 15,
@@ -425,7 +428,7 @@ class CaptioningVTMModel(CaptioningModel):
         }
         self.beam_generator = TextGenerator(
             args=predictor_config, model=self.textual, text_encoder=self.text_encoder)
-
+        '''
     @torch.no_grad()
     def infer_vtm(self, visual_features, caption_token_input, visual_features_valid, batch):
         _, cls_prob = self.textual(
@@ -562,11 +565,10 @@ class CaptioningVTMModel(CaptioningModel):
             # start_predictions = torch.tensor([101, 6228, 7574, 3227, 4850]).repeat(batch_size, 1).long().to(visual_features.device)
         else:
             # if batch size is larger than 1, the prefix length could be
-            # different, and we have to padding non-valid data, which
-            # is not supported
+            # different, and we have to padding non-valid data, which is not supported
             assert len(batch['prefix']) == 1, 'not supported'
             start_predictions = batch['prefix'].long()
-
+        '''
         self.prev_encoded_layers = None
         padding_mask = torch.ones_like(
             visual_features[:, :, 0]).long()
@@ -579,6 +581,7 @@ class CaptioningVTMModel(CaptioningModel):
             'logprobs': topk_probs,
         }
         return output_dict
+        '''
         # Add image features as a default argument to match callable
         # signature accepted by beam search class (partial captions only).
         decoding_step = functools.partial(

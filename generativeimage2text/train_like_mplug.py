@@ -131,17 +131,27 @@ def evaluation(model, data_loader, tokenizer, device, config):
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
         from tqdm import tqdm
-        for i in tqdm(range(len(image_names))):
-            input_data = {
-                'image': image[i:i+1],
-                'need_predict': caption['attention_mask'][i:i+1],
-                'caption_tokens': caption['input_ids'][i:i+1],
-            }
-            result = model(input_data)
-            cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
-        # for i in range(result['predictions'].shape[0]):
+        input_data = {
+            'image': image,
+            'need_predict': caption['attention_mask'],
+            'caption_tokens': caption['input_ids'],
+        }
+        result = model(input_data)
+        cls_prob = result.get('cls_prob', torch.zeros((image.shape[0], 2)))
+
+        # for i in tqdm(range(len(image_names))):
+        #     input_data = {
+        #         'image': image[i:i+1],
+        #         'need_predict': caption['attention_mask'][i:i+1],
+        #         'caption_tokens': caption['input_ids'][i:i+1],
+        #     }
+        #     result = model(input_data)
+        #     cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
+        # import pdb
+        # pdb.set_trace()
+        for i in range(len(result['predictions'])):
             cap = tokenizer.decode(
-                result['predictions'][0],
+                result['predictions'][i][0],
                 skip_special_tokens=True)
             cap = cap.replace(
                 "[CLS]", "").replace("[PAD]", "").strip()
@@ -149,7 +159,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "question_id": image_names[i],
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
-                "vtm_score": cls_prob[0, 1].item()})
+                "vtm_score": cls_prob[i, 1].item()})
 
         # import
         # for image_id, topk_id, topk_prob, gold_caption_list in zip(image_names, topk_ids, topk_probs, caption['input_ids']):

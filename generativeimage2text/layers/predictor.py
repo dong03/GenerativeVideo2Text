@@ -199,7 +199,6 @@ class TextGenerator(object):
         dec_position_ids = None
         caption_lengths = None
         for step in range(max_length):
-            import pdb; pdb.set_trace()
             caption_lengths = torch.ones_like(alive_seq)
 
             if self.text_encoder is not None:

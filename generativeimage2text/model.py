@@ -31,9 +31,9 @@ def get_git_model(tokenizer, param, dcb_param=None):
         if dcb_param['vtm'] and dcb_param['dense']:
             TEXT_DECODER = TransformerDecoderClfTextualHead
             CAP_MODEL = CaptioningVTMDenseModel
-            # TEXT_ENCODER = None
-            TEXT_ENCODER = GPT2Model.from_pretrained(
-                "uer/gpt2-chinese-cluecorpussmall")
+            TEXT_ENCODER = None
+            # TEXT_ENCODER = GPT2Model.from_pretrained(
+            #     "uer/gpt2-chinese-cluecorpussmall")
             # TEXT_ENCODER = ChineseCLIPModel.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16").text_model
 
         elif not dcb_param['vtm'] and not dcb_param['dense']:
