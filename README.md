@@ -1,3 +1,31 @@
+# GVT
+- 模型结构改动：```generativeimage2text/layers/dcb_decoder.py```
+- 数据集改动：```generativeimage2text/dataset/video_dataset_dcb.py```
+- 训练代码：```generativeimage2text/train_like_mplug.py```
+- 推理代码：```generativeimage2text/infer_like_mplug.py```
+- 训练脚本：
+  ```bash
+  cd generativeimage2text
+  bash vtmsparse.sh GPU_ID GPU_Number Port
+  # e.g. bash vtmsparsh.sh 0,1,2,3 4 3520
+  ```
+- 推理
+  ```bash
+  cd generativeimage2text
+  bash test.sh GPU_ID
+  # e.g. bash test.sh 0
+  ```
+- 配置文件：```config/train_vtmsparse_mix.yaml```
+  ```yaml
+  train_file: list，每个文件为训练信息索引  videoid\tcaption\n
+  train_root: list，对应相同顺序的文件的帧的储存位置 train_root/videoid为存放帧的文件夹
+  num_frm_test: 每个视频加载多少帧
+  vtm: True/False，是否具有video text matching
+  dense: True/False，是否密集采帧
+  sparse: True/False，是否稀疏采帧
+  ```
+- ckpt存储路径：```output/```
+- 推理结果路径：```ckpt/results```
 # Introduction
 This repo presents some example codes to reproduce some results in
 [GIT: A Generative Image-to-text Transformer for Vision and Language](https://arxiv.org/abs/2205.14100).
