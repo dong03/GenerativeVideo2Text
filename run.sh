@@ -1,9 +1,30 @@
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE', \
+#       'prefix': '', \
+#       'gpu_id': '2', \
+# }"
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE', \
+#       'prefix': '', \
+#       'gpu_id': '2', \
+#       'ckpt': './output/vatexcn.pth'
+# }"
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE', \
+#       'prefix': '', \
+#       'gpu_id': '2', \
+#       'ckpt': './output/git_randombv.pth'
+# }"
+
 AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
 "{'type': 'each_dcb_inference_single_image', \
-      'model_name': 'GIT_BASE_VATEX', \
+      'model_name': 'GIT_BASE', \
       'prefix': '', \
-      'gpu_id': '0', \
-      'ckpt': './output/git_randombv.pth'
+      'gpu_id': '2', \
+      'ckpt': './output/GIT_RandomBV.pth'
 }"
 
 
