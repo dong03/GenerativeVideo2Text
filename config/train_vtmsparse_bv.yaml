@@ -1,11 +1,11 @@
 dataset_name: "BV"
-train_root: "../VisualSearch/BV_Frame"
-train_file: "../data/train_bvcap_captitle.txt"
-val_root: "../VisualSearch/BV_Frame"
-val_file: "../data/val_bvcap_captitle_pro.txt"
+train_root: ["../VisualSearch/BV_Frame"]
+train_file: ["../data/train_bvcap_captitle.txt"]
+val_root: ["../VisualSearch/BV_Frame"]
+val_file: ["../data/val_bvcap_captitle_pro.txt"]
 
-test_root: "../VisualSearch/BV_Frame"
-test_file: "../data/BV_0417_caption_cn.txt"
+test_root: ["../VisualSearch/BV_Frame"]
+test_file: ["../data/BV_0417_caption_cn.txt"]
 
 freeze: "image"
 read_local_data: True
@@ -24,16 +24,16 @@ num_frm_test: 8
 alpha: 0.4
 warm_up: True
 
-optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 1.0e-5, weight_decay: 0.02 }
+optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 5.0e-5, weight_decay: 0.02 }
 schedular:
   {
     sched: cosine,
-    lr: 1.0e-5,
-    epochs: 8,
+    lr: 5.0e-5,
+    epochs: 16,
     min_lr: 1.0e-6,
     decay_rate: 1,
     warmup_lr: 1.0e-5,
-    warmup_epochs: 4,
+    warmup_epochs: 2,
     cooldown_epochs: 0,
   }
 use_checkpoint: true

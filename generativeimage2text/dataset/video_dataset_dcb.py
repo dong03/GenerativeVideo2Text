@@ -204,11 +204,10 @@ class dcb_images_caps_dataset(Dataset):
         for ann_file_, video_root_ in zip(ann_file, video_root):
             ann = open(ann_file_).readlines()
             ann = [each.strip().split('\t') for each in ann]
-            ann = [os.path.join(video_root_, each[0].split('#')[0]), each[1] for each in ann]
+            ann = [[os.path.join(video_root_, each[0].split('#')[
+                                 0]), each[1]] for each in ann]
             self.ann.extend(ann)
-            
-        self.ann = open(ann_file).readlines()
-        self.ann = [each.strip().split('\t') for each in self.ann]
+            print(f"load {ann_file_} done")
 
         self.max_words = max_words
         self.read_local_data = read_local_data

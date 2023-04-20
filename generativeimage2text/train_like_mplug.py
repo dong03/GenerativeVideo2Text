@@ -133,7 +133,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
 
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
-        
+
         for i in tqdm(range(len(image_names))):
             input_data = {
                 'image': image[i:i+1],
@@ -154,6 +154,8 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
                 "vtm_score": cls_prob[0, 1].item()})
     return ral_val
+
+
 @torch.no_grad()
 def evaluation_mplugdecoder(model, data_loader, tokenizer, device, config):
     # test

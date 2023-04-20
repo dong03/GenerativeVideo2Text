@@ -39,6 +39,8 @@ def get_git_model(tokenizer, param, dcb_param=None):
             TEXT_DECODER = TransformerDecoderClfTextualHead
             CAP_MODEL = CaptioningVTMSparseModel
             TEXT_ENCODER = None
+            # TEXT_ENCODER = GPT2Model.from_pretrained(
+            #     "uer/gpt2-chinese-cluecorpussmall")
         elif not dcb_param['vtm'] and not dcb_param['dense'] and not dcb_param['sparse']:
             TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningModel
