@@ -23,7 +23,7 @@ def get_git_model(tokenizer, param, dcb_param=None):
         param.get('image_encoder_type', 'CLIPViT_B_16'),
         input_resolution=param.get('test_crop_size', 224),
     )
-    if dcb_param is None:
+    if dcb_param is None or (not dcb_param['vtm'] and not dcb_param['dense'] and not dcb_param['sparse']):
         TEXT_DECODER = TransformerDecoderTextualHead
         CAP_MODEL = CaptioningModel
         TEXT_ENCODER = None

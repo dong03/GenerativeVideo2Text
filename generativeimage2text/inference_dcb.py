@@ -241,6 +241,7 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id, ckpt=None):
 
     # prefix
     max_text_len = 40
+    prefix_sen = prefix.replace(' ','-')
     prefix_encoding = tokenizer(prefix,
                                 padding='do_not_pad',
                                 truncation=True,
@@ -257,7 +258,7 @@ def each_dcb_inference_single_image(model_name, prefix, gpu_id, ckpt=None):
     videos = open(file, encoding='utf-8').readlines()
     videos = [each.strip().split('\t')[0] for each in videos]
     name_plus = os.path.split(ckpt)[-1] if ckpt else ''
-    with open(f'{model_name}_{name_plus}_BV_0417.txt', 'w') as f:
+    with open(f'{model_name}_{name_plus}_{prefix_sen}_BV_0417.txt', 'w') as f:
         for ix, bv in enumerate(tqdm(videos)):
             try:
                 # import pdb; pdb.set_trace()

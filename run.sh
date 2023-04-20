@@ -19,15 +19,39 @@
 #       'ckpt': './output/git_randombv.pth'
 # }"
 
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE', \
+#       'prefix': '', \
+#       'gpu_id': '2', \
+#       'ckpt': './output/GIT_RandomBV.pth'
+# }"
+
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE_VATEX', \
+#       'ckpt': '/home/dcb/code/bv/GenerativeImage2Text/output/git_fi_captitle.pth', \
+#       'gpu_id': '2', \
+#       'prefix': '场景'
+# }" &\
+# AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
+# "{'type': 'each_dcb_inference_single_image', \
+#       'model_name': 'GIT_BASE_VATEX', \
+#       'ckpt': '/home/dcb/code/bv/GenerativeImage2Text/output/git_fi_captitle.pth', \
+#       'gpu_id': '3', \
+#       'prefix': '物体'
+# }" & \
+
 AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
 "{'type': 'each_dcb_inference_single_image', \
-      'model_name': 'GIT_BASE', \
-      'prefix': '', \
-      'gpu_id': '2', \
-      'ckpt': './output/GIT_RandomBV.pth'
+      'model_name': 'GIT_BASE_VATEX', \
+      'ckpt': '/home/dcb/code/bv/GenerativeImage2Text/output/git_fi_captitle.pth', \
+      'gpu_id': '1', \
+      'prefix': '什么动作？'
 }"
 
 
+。
 # AZFUSE_TSV_USE_FUSE=1 python -m generativeimage2text.inference_dcb -p \
 # "{'type': 'each_dcb_inference_single_image', \
 #       'model_name': 'GIT_BASE_VATEX', \
