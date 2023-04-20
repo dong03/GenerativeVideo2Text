@@ -436,15 +436,13 @@ class CaptioningSparseModel(CaptioningModel):
                 input = batch['image'].reshape(-1, batch['image'].shape[-3],
                                                batch['image'].shape[-2], batch['image'].shape[-1])
                 features = self.image_encoder(input)
-                bz = features.shape[0]
-                corse_features = features[:, 0, :]
-                fine_features = features[bz//2]
-
-                import pdb
-                pdb.set_trace()
-                features = features[:, 0, :]
-                features = features.reshape(
+                bz,num_frame = batch['image'].shape[:2]
+                
+                corse_features = features[:, 0, :].reshape(
                     batch['image'].shape[0], batch['image'].shape[1], -1)
+                fine_features = features[[num_frame // 2+ num_frame *i for i in range(bz)]]
+                
+                features = torch.cat([corse_features, fine_features], dim=1)
                 # features = features.reshape(
                 #     batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1])
                 # if self.num_image_with_embedding:

@@ -1,6 +1,15 @@
 dataset_name: "BV"
-train_root: ["../VisualSearch/BV_Frame"]
-train_file: ["../data/train_bvcap_captitle.txt"]
+train_root: [
+  "../VisualSearch/BV_Frame",
+  "../VisualSearch/vatex_train_frame",
+  "../VisualSearch/Webvid_Frame"
+  ]
+train_file: [
+  "../data/train_bvcap_captitle.txt",
+  "../data/vatex_train.rawcaption_ch.txt",
+  "../data/webvid_f7.txt"
+  ]
+
 val_root: ["../VisualSearch/BV_Frame"]
 val_file: ["../data/val_bvcap_captitle_pro.txt"]
 
@@ -19,7 +28,7 @@ batch_size_train: 32
 vision_width: 1024
 batch_size_test: 8
 k_test: 128
-num_frm_test: 8
+num_frm_test: 16
 
 alpha: 0.4
 warm_up: True
@@ -33,7 +42,7 @@ schedular:
     min_lr: 1.0e-6,
     decay_rate: 1,
     warmup_lr: 1.0e-5,
-    warmup_epochs: 2,
+    warmup_epochs: 1,
     cooldown_epochs: 0,
   }
 use_checkpoint: true

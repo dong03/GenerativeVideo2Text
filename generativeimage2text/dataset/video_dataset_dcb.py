@@ -200,9 +200,14 @@ class dcb_images_caps_dataset(Dataset):
     def __init__(self, ann_file, video_root, max_words=30, read_local_data=True, is_train=True, num_frm=4, transform=None,
                  frm_sampling_strategy="rand", max_img_size=384, video_fmt=''
                  ):
-
-        self.ann = open(ann_file).readlines()
-        self.ann = [each.strip().split('\t') for each in self.ann]
+        self.ann = []
+        for ann_file_, video_root_ in zip(ann_file, video_root):
+            ann = open(ann_file_).readlines()
+            ann = [each.strip().split('\t') for each in ann]
+            ann = [[os.path.join(video_root_, each[0].split('#')[
+                                 0]), each[1]] for each in ann]
+            self.ann.extend(ann)
+            print(f"load {ann_file_} done")
 
         self.max_words = max_words
         self.read_local_data = read_local_data
@@ -248,15 +253,15 @@ class dcb_images_caps_dataset(Dataset):
     def __getitem__(self, index):
         try:
 
-            video_name, cap = self.ann[index]
-            video_name = video_name.split('#')[0]
-            video_path = os.path.join(self.video_root, video_name)
+            video_path, cap = self.ann[index]
+            # video_name = video_name.split('#')[0]
+            # video_path = os.path.join(self.video_root, video_name)
             video = self._load_video_from_path(video_path)
             cap = pre_caption(cap, 128)
         except:
             print(index)
             video = torch.zeros((self.num_frm, 3, 224, 224))
-            video_name = ''
+            video_path = ''
             cap = ''
-        return video, video_name, cap
+        return video, video_path, cap
         # import pdb; pdb.set_trace()
