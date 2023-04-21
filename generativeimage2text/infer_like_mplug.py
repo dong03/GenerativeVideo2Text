@@ -24,7 +24,7 @@ matplotlib.use('Agg')
 
 @torch.no_grad()
 def evaluation(model, data_loader, tokenizer, device, config):
-    # test
+    # test;
     model.eval()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -41,6 +41,10 @@ def evaluation(model, data_loader, tokenizer, device, config):
 
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
+        if 'prefix' in config:
+            prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
+                            max_length=args.max_input_length, return_tensors="pt").to(device)
+            prefix = prefix['input_ids'][:, :-1]
         from tqdm import tqdm
         for i in tqdm(range(len(image_names))):
             input_data = {
@@ -48,6 +52,9 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 'need_predict': caption['attention_mask'][i:i+1],
                 'caption_tokens': caption['input_ids'][i:i+1],
             }
+            if 'prefix' in config:
+                input_data['prefix'] = prefix
+            
             result = model(input_data)
             cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
         # for i in range(result['predictions'].shape[0]):
@@ -61,6 +68,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
                 "vtm_score": cls_prob[0, 1].item()})
+            import pdb; pdb.set_trace()
     return ral_val
 
 @torch.no_grad()
@@ -202,8 +210,10 @@ def main(args, config):
             model, test_loader, tokenizer, device, config)
         # import pdb; pdb.set_trace()
         save_file_name = os.path.split(
-            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(config['test_file'][0])[-1]
-        with open(os.path.join(args.output_dir, save_file_name), 'w') as f:
+            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(config['test_file'][0])[-1].split('.')[0]
+    if 'prefix' in config:
+        save_file_name += config['prefix'].replace(' ','-')
+        with open(os.path.join(args.output_dir, save_file_name + '.txt'), 'w') as f:
             for res in result:
                 f.write(f"{res['question_id']}\t{res['pred_caption']}\n")
 

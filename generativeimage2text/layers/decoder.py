@@ -849,6 +849,7 @@ class CaptioningModel(nn.Module):
         use_history_for_infer=False,
         pooling_images=None,
         num_image_with_embedding=6,
+        text_encoder = None
     ):
         super().__init__()
         self.image_encoder = visual
@@ -861,7 +862,7 @@ class CaptioningModel(nn.Module):
         self.decoder = decoder
         self.scst = scst
         self.tokenizer = tokenizer
-
+        self.text_encoder = None
         if self.scst:
             raise NotImplementedError
             # from .utils_caption_evaluate import (
