@@ -9,12 +9,19 @@
   bash vtmsparse.sh GPU_ID GPU_Number Port
   # e.g. bash vtmsparsh.sh 0,1,2,3 4 3520
   ```
-- 推理
+- 推理（Captioning）
   ```bash
   cd generativeimage2text
   bash test.sh GPU_ID
   # e.g. bash test.sh 0
   ```
+- 推理（Video-text matching）
+  ```bash 
+  cd generativeimage2text
+  bash test_vtm.sh GPU_ID
+  # e.g. bash test_vtm.sh 0
+  ```
+  
 - 配置文件：```config/train_vtmsparse_mix.yaml```
   ```yaml
   train_file: list，每个文件为训练信息索引  videoid\tcaption\n
@@ -26,6 +33,11 @@
   ```
 - ckpt存储路径：```output/```
 - 推理结果路径：```ckpt/results```
+- 训练细节：
+  - 冻住image-encoder
+  - 采用sparse visual token：对中间帧保留完整的197个token，其余帧仅使用[CLS] token，增加采样帧数（6帧->16帧）
+  - 取last text token + fc 做video-text matching的二分类，通过重新排列组合输入视频-描述语句构建负样本
+  - 总计训练15个epoch，学习率为5e-5，采用warmup、衰减等策略
 # Introduction
 This repo presents some example codes to reproduce some results in
 [GIT: A Generative Image-to-text Transformer for Vision and Language](https://arxiv.org/abs/2205.14100).

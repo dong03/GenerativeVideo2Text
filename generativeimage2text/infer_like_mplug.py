@@ -1,10 +1,6 @@
-from apex import amp
 from torch_common import torch_load, load_state_dict
 from model import get_git_model
-from optim import create_optimizer, create_two_optimizer
-from scheduler import create_scheduler
 from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
-from dataset.utils import save_result
 import utils
 from transformers import ChineseCLIPProcessor, ChineseCLIPModel, AutoTokenizer
 import torch.distributed as dist
@@ -16,13 +12,12 @@ import datetime
 import time
 import random
 import numpy as np
-import language_evaluation
+import pickle
 import ruamel.yaml as yaml
 import os
 import argparse
 import matplotlib
-from apex import amp
-import apex
+import collections
 from tqdm import tqdm
 matplotlib.use('Agg')
 
@@ -40,8 +35,8 @@ def evaluation(model, data_loader, tokenizer, device, config):
 
     answer_input = None
     for n, (image, image_names, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        if n == 5:
-            break
+        # if n == 5:
+        #     break
         image = image.to(device, non_blocking=True)
 
         caption = tokenizer(caption, padding='longest', truncation=True,
@@ -69,6 +64,40 @@ def evaluation(model, data_loader, tokenizer, device, config):
     return ral_val
 
 @torch.no_grad()
+def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
+    # test
+    model.eval()
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = 'Generate video-text matching test result:'
+    print_freq = 5
+
+    ral_val = collections.defaultdict(list)
+    
+    for n, (image, image_names, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        # if n == 5:
+        #     break
+        image = image.to(device, non_blocking=True)
+
+        for tag in tqdm(tags):
+            # caption = f"一个关于{tag}的视频"
+            caption = tag
+            caption = tokenizer(caption, padding='longest', truncation=True,
+                                max_length=args.max_input_length, return_tensors="pt").to(device)
+            input_data = {
+                'image': image,
+                'need_predict': caption['attention_mask'],
+                'caption_tokens': caption['input_ids']
+            }
+            result = model.vtm(input_data)
+            
+            for i in range(len(image_names)):
+                ral_val[image_names[i]].append(result[i])
+            
+    return ral_val
+
+
+@torch.no_grad()
 def evaluation_mplugdecoder(model, data_loader, tokenizer, device, config):
     # test
     model.eval()
@@ -87,7 +116,7 @@ def evaluation_mplugdecoder(model, data_loader, tokenizer, device, config):
 
         caption = tokenizer(caption, padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
-        
+
         input_data = {
             'image': image,
             'need_predict': caption['attention_mask'],
@@ -146,7 +175,8 @@ def main(args, config):
     # tokenizer = ChineseCLIPProcessor.from_pretrained(
     #     "OFA-Sys/chinese-clip-vit-base-patch16")
     # tokenizer = tokenizer.tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "uer/gpt2-chinese-cluecorpussmall")
     model = get_git_model(tokenizer, {}, config)
 
     checkpoint = torch.load(args.checkpoint, map_location='cpu')['model']
@@ -156,14 +186,26 @@ def main(args, config):
     model.eval()
     model = model.to(device)
     get_parameter_number(model)
-    result = evaluation(
-        model, test_loader, tokenizer, device, config)
-
-    save_file_name = os.path.split(
-        args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(config['test_file'])[-1]
-    with open(os.path.join(args.output_dir, save_file_name), 'w') as f:
-        for res in result:
-            f.write(f"{res['question_id']}\t{res['pred_caption']}\n")
+    if os.path.exists(args.vtm_file):
+        tags = open(args.vtm_file).readlines()
+        tags = [each.strip().split('\t') for each in tags]
+        result = evaluation(model, test_loader, tokenizer,device, config, tags)
+        
+        save_file_name = os.path.split(
+            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(args.vtm_file)[-1].split('.')[0] + '.pkl'
+        
+        with open(save_file_name, 'wb') as f:
+            pickle.dump(result, f)
+            
+    else:
+        result = evaluation(
+            model, test_loader, tokenizer, device, config)
+        # import pdb; pdb.set_trace()
+        save_file_name = os.path.split(
+            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(config['test_file'][0])[-1]
+        with open(os.path.join(args.output_dir, save_file_name), 'w') as f:
+            for res in result:
+                f.write(f"{res['question_id']}\t{res['pred_caption']}\n")
 
     # result_file = save_result(vqa_result, args.result_dir, 'vqa_result_epoch10')
     # if utils.is_main_process():
@@ -196,6 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_init_decocde', action='store_true')
     parser.add_argument('--do_accum', action='store_true')
     parser.add_argument('--accum_steps', default=4, type=int)
+    parser.add_argument('--vtm_file', default='')
     args = parser.parse_args()
 
     config = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)

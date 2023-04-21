@@ -46,6 +46,10 @@ def get_git_model(tokenizer, param, dcb_param=None):
             CAP_MODEL = CaptioningModel
             TEXT_ENCODER = None
         # not sure, may be need to be delated
+        elif not dcb_param['vtm'] and dcb_param['sparse']:
+            TEXT_DECODER = TransformerDecoderTextualHead
+            CAP_MODEL = CaptioningSparseModel
+            TEXT_ENCODER = None
         elif not dcb_param['vtm']:
             TEXT_DECODER = TransformerDecoderTextualHead
             CAP_MODEL = CaptioningDenseModel
@@ -58,6 +62,8 @@ def get_git_model(tokenizer, param, dcb_param=None):
             # ChineseCLIPModel.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16").text_model
         else:
             raise NotImplementedError
+    print(f"========{TEXT_DECODER}=======")
+    print(f"========{CAP_MODEL}=======")
     text_decoder = TEXT_DECODER(
         visual_feature_size=param.get('visual_feature_size', 768),
         vocab_size=tokenizer.vocab_size,

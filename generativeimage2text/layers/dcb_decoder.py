@@ -46,7 +46,7 @@ class BertEncoderAsDecoder(nn.Module):
                                device=device, dtype=dtype)
         top_right = torch.full((num_memory, num_tgt), float(
             '-inf'), device=tgt.device, dtype=dtype,)
-        top_right[0] = torch.zeros(num_tgt, device=device, dtype=dtype)
+        # top_right[0] = torch.zeros(num_tgt, device=device, dtype=dtype)
 
         bottom_left = torch.zeros(
             (num_tgt, num_memory), dtype=dtype, device=tgt_mask.device,)
@@ -91,7 +91,7 @@ class BertEncoderAsDecoder(nn.Module):
                 encoder_history_states=encoder_history_states,
             )
             result = list(result)
-            cls_pos = result[0][:, 0]
+            cls_pos = result[0][:, -1]
             result[0] = result[0][:, num_memory:].transpose(0, 1)
             if self.encoder.output_hidden_states:
                 return result[0], result[1]
@@ -436,12 +436,13 @@ class CaptioningSparseModel(CaptioningModel):
                 input = batch['image'].reshape(-1, batch['image'].shape[-3],
                                                batch['image'].shape[-2], batch['image'].shape[-1])
                 features = self.image_encoder(input)
-                bz,num_frame = batch['image'].shape[:2]
-                
+                bz, num_frame = batch['image'].shape[:2]
+
                 corse_features = features[:, 0, :].reshape(
                     batch['image'].shape[0], batch['image'].shape[1], -1)
-                fine_features = features[[num_frame // 2+ num_frame *i for i in range(bz)]]
-                
+                fine_features = features[[num_frame //
+                                          2 + num_frame * i for i in range(bz)]]
+
                 features = torch.cat([corse_features, fine_features], dim=1)
                 # features = features.reshape(
                 #     batch['image'].shape[0], batch['image'].shape[1], features.shape[-2], features.shape[-1])
@@ -582,7 +583,9 @@ class CaptioningVTMModel(CaptioningModel):
             BZ = visual_features.shape[0]
             flag = visual_features[:, 0].clone()
             flag = flag / flag.norm(dim=1, keepdim=True)
-            matrix = 1 - (flag @ flag.T)
+            matrix = flag @ flag.T
+            matrix = -torch.abs(0.5-torch.sin(1.0-matrix)) + 0.5
+            # matrix = 1 - (flag @ flag.T)
             matrix = matrix.cpu()
             matrix = (torch.ones_like(matrix) - torch.eye(BZ)) * matrix
 
@@ -873,6 +876,26 @@ class CaptioningVTMSparseModel(CaptioningVTMModel):
                          text_encoder)
 
         self.vtm_loss = nn.CrossEntropyLoss()
+    
+    @torch.no_grad()
+    def vtm(self, batch):
+        input = batch['image'].reshape(-1, batch['image'].shape[-3],
+                                               batch['image'].shape[-2], batch['image'].shape[-1])
+        features = self.image_encoder(input)
+        bz, num_frame = batch['image'].shape[:2]
+
+        corse_features = features[:, 0, :].reshape(
+            batch['image'].shape[0], batch['image'].shape[1], -1)
+        fine_features = features[[num_frame //
+                                    2 + num_frame * i for i in range(bz)]]
+
+        features = torch.cat([corse_features, fine_features], dim=1)
+        visual_features = features.reshape(
+                        features.shape[0], -1, 768)
+        cls_prob = self.infer_vtm(
+                visual_features, batch['caption_tokens'], None, batch)
+        cls_prob = F.softmax(cls_prob, dim=1)
+        return cls_prob[:, 1].view(-1)
 
     def forward_one(self, batch, return_info=False):
         # shape: (batch_size, max_caption_length, vocab_size)
@@ -882,12 +905,13 @@ class CaptioningVTMSparseModel(CaptioningVTMModel):
                 input = batch['image'].reshape(-1, batch['image'].shape[-3],
                                                batch['image'].shape[-2], batch['image'].shape[-1])
                 features = self.image_encoder(input)
-                bz,num_frame = batch['image'].shape[:2]
-                
+                bz, num_frame = batch['image'].shape[:2]
+
                 corse_features = features[:, 0, :].reshape(
                     batch['image'].shape[0], batch['image'].shape[1], -1)
-                fine_features = features[[num_frame // 2+ num_frame *i for i in range(bz)]]
-                
+                fine_features = features[[num_frame //
+                                          2 + num_frame * i for i in range(bz)]]
+
                 features = torch.cat([corse_features, fine_features], dim=1)
                 # import pdb
                 # pdb.set_trace()
