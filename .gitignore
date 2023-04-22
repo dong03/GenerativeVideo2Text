@@ -5,7 +5,9 @@
 
 # User-specific files
 *.rsuser
-*.suo
+*.suoS
+*.pth
+*.npy
 *.user
 *.userosscache
 *.sln.docstates
@@ -360,3 +362,4 @@ build/
 *.egg-info/
 output/
 
+ChinaOpenCkpt
