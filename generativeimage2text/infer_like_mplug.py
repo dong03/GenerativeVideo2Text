@@ -68,7 +68,6 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "pred_caption": cap,
                 "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
                 "vtm_score": cls_prob[0, 1].item()})
-            import pdb; pdb.set_trace()
     return ral_val
 
 @torch.no_grad()
@@ -81,15 +80,18 @@ def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
     print_freq = 5
 
     ral_val = collections.defaultdict(list)
-    
+    BZ_Video = len(data_loader.dataset)
+    BZ_Text = len(tags)
+    video2text = np.zeros((BZ_Video, BZ_Text))
+    start_ix = 0
     for n, (image, image_names, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # if n == 5:
         #     break
         image = image.to(device, non_blocking=True)
 
-        for tag in tqdm(tags):
+        for ix, tag in enumerate(tqdm(tags)):
             # caption = f"一个关于{tag}的视频"
-            caption = tag
+            caption = [tag for _ in range(image.shape[0])]
             caption = tokenizer(caption, padding='longest', truncation=True,
                                 max_length=args.max_input_length, return_tensors="pt").to(device)
             input_data = {
@@ -97,12 +99,15 @@ def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
                 'need_predict': caption['attention_mask'],
                 'caption_tokens': caption['input_ids']
             }
-            result = model.vtm(input_data)
+            result = model.vtm(input_data).cpu().numpy()
+            video2text[start_ix:start_ix + image.shape[0], ix] = result.copy()
             
-            for i in range(len(image_names)):
-                ral_val[image_names[i]].append(result[i])
-            
-    return ral_val
+            # for i in range(len(image_names)):
+            #     ral_val[image_names[i]].append(result[i].item())
+        start_ix += image.shape[0]
+        # if n: 
+        #     import pdb; pdb.set_trace()
+    return video2text
 
 
 @torch.no_grad()
@@ -175,8 +180,8 @@ def main(args, config):
     samplers = [None, None, None]
     _, _, test_loader = create_loader(datasets, samplers,
                                       batch_size=[
-                                          config['batch_size_train'], config['batch_size_test'], 4],
-                                      num_workers=[32, 8, 8], is_trains=[True, False, False],
+                                          config['batch_size_train'], config['batch_size_test'], config['batch_size_test'] * 4],
+                                      num_workers=[32, 8, 32], is_trains=[True, False, False],
                                       collate_fns=[cap_collate_fn, cap_collate_fn, cap_collate_fn])
 
     # tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
@@ -196,14 +201,14 @@ def main(args, config):
     get_parameter_number(model)
     if os.path.exists(args.vtm_file):
         tags = open(args.vtm_file).readlines()
-        tags = [each.strip().split('\t') for each in tags]
-        result = evaluation(model, test_loader, tokenizer,device, config, tags)
+        tags = [each.strip().split('\t')[-1] for each in tags]
+        video2text = evaluation_vtm(model, test_loader, tokenizer,device, config, tags)
         
         save_file_name = os.path.split(
-            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(args.vtm_file)[-1].split('.')[0] + '.pkl'
-        
-        with open(save_file_name, 'wb') as f:
-            pickle.dump(result, f)
+            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(args.vtm_file)[-1].split('.')[0] + '.npy'
+        np.save(save_file_name, video2text)
+        # with open(save_file_name, 'wb') as f:
+        #     pickle.dump(result, f)
             
     else:
         result = evaluation(
@@ -211,8 +216,9 @@ def main(args, config):
         # import pdb; pdb.set_trace()
         save_file_name = os.path.split(
             args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(config['test_file'][0])[-1].split('.')[0]
-    if 'prefix' in config:
-        save_file_name += config['prefix'].replace(' ','-')
+        if 'prefix' in config:
+            save_file_name += config['prefix'].replace(' ','-')
+        
         with open(os.path.join(args.output_dir, save_file_name + '.txt'), 'w') as f:
             for res in result:
                 f.write(f"{res['question_id']}\t{res['pred_caption']}\n")

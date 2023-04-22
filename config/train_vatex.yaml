@@ -11,7 +11,10 @@ freeze: 'image'
 
 read_local_data: True
 
-model_name: 'GIT_BASE_VATEX'
+model_name: 'GIT_BASE'
+vtm: False
+dense: False
+sparse: False
 image_res: 224
 batch_size_train: 8
 vision_width: 1024

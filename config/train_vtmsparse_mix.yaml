@@ -19,7 +19,7 @@ test_file: ["../data/BV_0417_caption_cn.txt"]
 freeze: "image"
 read_local_data: True
 
-model_name: "GIT_BASE_VATEX"
+model_name: "GIT_BASE"
 vtm: True
 dense: False
 sparse: True

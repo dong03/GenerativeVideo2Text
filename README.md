@@ -38,6 +38,23 @@
   - 采用sparse visual token：对中间帧保留完整的197个token，其余帧仅使用[CLS] token，增加采样帧数（6帧->16帧）
   - 取last text token + fc 做video-text matching的二分类，通过重新排列组合输入视频-描述语句构建负样本
   - 总计训练15个epoch，学习率为5e-5，采用warmup、衰减等策略
+
+- 结果：
+
+| Captioning     |  config                                     |  模型ckpt                                        | 结果                                                          |
+|----------------|---------------------------------------------|------------------------------------------------|-------------------------------------------------------------|
+|  GIT(VATEX CN) | [train_vatex.yaml](config/train_vatex.yaml) | [GIT_ft_Vatex.pth](ChinaOpenCkpt/GIT_ft_Vatex.pth) | [GIT_ft_Vatex.txt](ChinaOpenResults/GIT_ft_Vatex.txt)       |
+| GIT(RandomBV)  | [train_bv.yaml](config/train_bv.yaml)       | [GIT_ft_RandomBV.pth](ChinaOpenCkpt/GIT_ft_RandomBV.pth)                         | [GIT_ft_RandomBV.txt](ChinaOpenResults/GIT_ft_ChinaOpen.txt) |
+| GIT(ChinaOpen)  | [train_bv.yaml](config/train_bv.yaml)       | [GIT_ft_ChinaOpen.pth](ChinaOpenCkpt/GIT_ft_ChinaOpen.pth)                         | [GIT_ft_ChinaOpen.txt](ChinaOpenResults/GIT_ft_ChinaOpen.txt) |
+| GVT(ChinaOpen,w/o VTM)  | [train_sparse_bv.yaml](config/train_sparse_bv.yaml)       | [GVT_ft_ChinaOpen_woVTM.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen_woVTM.pth)                         | [GVT_ft_ChinaOpen_woVTM.txt](ChinaOpenResults/GVT_ft_ChinaOpen_woVTM.txt) |
+| GVT(ChinaOpen)  | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml)       | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth)                         | [GVT_ft_ChinaOpen.txt](ChinaOpenResults/GVT_ft_ChinaOpen.txt) |
+
+
+| Matching(v2t)     |  config                                     |  模型ckpt                                        | 结果                                                          |
+|----------------|---------------------------------------------|------------------------------------------------|-------------------------------------------------------------|
+|  GVT(ChinaOpen, content-based) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GIT_ft_Vatex.txt](ChinaOpenResults/GVT_ChinaOpen_caption.npy)       |
+|  GVT(ChinaOpen, content-beyond) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GIT_ft_Vatex.txt](ChinaOpenResults/GVT_ChinaOpen_title.npy)       |
+
 # Introduction
 This repo presents some example codes to reproduce some results in
 [GIT: A Generative Image-to-text Transformer for Vision and Language](https://arxiv.org/abs/2205.14100).

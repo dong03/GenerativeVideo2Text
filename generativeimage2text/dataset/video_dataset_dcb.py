@@ -263,5 +263,5 @@ class dcb_images_caps_dataset(Dataset):
             video = torch.zeros((self.num_frm, 3, 224, 224))
             video_path = ''
             cap = ''
-        return video, video_path, cap
+        return video, video_path.split('/')[-1], cap
         # import pdb; pdb.set_trace()
