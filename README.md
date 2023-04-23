@@ -52,8 +52,9 @@
 
 | Matching(v2t)     |  config                                     |  模型ckpt                                        | 结果                                                          |
 |----------------|---------------------------------------------|------------------------------------------------|-------------------------------------------------------------|
-|  GVT(ChinaOpen, content-based) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GIT_ft_Vatex.txt](ChinaOpenResults/GVT_ChinaOpen_caption.npy)       |
-|  GVT(ChinaOpen, content-beyond) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GIT_ft_Vatex.txt](ChinaOpenResults/GVT_ChinaOpen_title.npy)       |
+|  GVT(ChinaOpen, content-based) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GVT_ChinaOpen_caption.npy](ChinaOpenResults/GVT_ChinaOpen_caption.npy)       |
+|  GVT(ChinaOpen, content-beyond) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GVT_ChinaOpen_title.npy](ChinaOpenResults/GVT_ChinaOpen_title.npy)       |
+|  GVT(ChinaOpen, content-beyond) | [train_vtmsparse_bv.yaml](config/train_vtmsparse_bv.yaml) | [GVT_ft_ChinaOpen.pth](ChinaOpenCkpt/GVT_ft_ChinaOpen.pth) | [GVT_ChinaOpen_tagging.npy](ChinaOpenResults/GVT_ChinaOpen_tagging.npy)       |
 
 # Introduction
 This repo presents some example codes to reproduce some results in
