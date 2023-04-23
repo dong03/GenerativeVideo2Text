@@ -19,7 +19,7 @@
 TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python infer_like_mplug.py \
     --config ../config/train_sparse_bv.yaml \
     --output_dir ../ckpt/results/ \
-    --checkpoint ../output/git_sparse_bv.pth \
+    --checkpoint ../output/gvt_vtmsparse_semi.pth \
     --min_length 15 \
     --beam_size 10 \
     --max_length 32 \
