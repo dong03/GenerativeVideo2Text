@@ -580,14 +580,23 @@ class CaptioningVTMModel(CaptioningModel):
             # if self.use_masked_as_input_for_train:
             #caption_token_input = batch["masked_caption_tokens"]
             # else:
+
             BZ = visual_features.shape[0]
             flag = visual_features[:, 0].clone()
             flag = flag / flag.norm(dim=1, keepdim=True)
             matrix = flag @ flag.T
-            matrix = -torch.abs(0.5-torch.sin(1.0-matrix)) + 0.5
-            # matrix = 1 - (flag @ flag.T)
-            matrix = matrix.cpu()
-            matrix = (torch.ones_like(matrix) - torch.eye(BZ)) * matrix
+
+            # '''semi'''
+            # matrix = -torch.abs(0.5-torch.sin(1.0-matrix)) + 0.5
+            # # matrix = 1 - (flag @ flag.T)
+            # matrix = matrix.cpu()
+            # matrix = (torch.ones_like(matrix) - torch.eye(BZ)) * matrix
+            '''hard'''
+            idx = batch['idx']
+            idx = idx.view(-1, 1)
+            mask = torch.eq(idx, idx.T).bool().to(matrix.device)
+            matrix = F.softmax(matrix+1e-6, dim=1)
+            matrix = matrix.masked_fill(mask, 0.0)
 
             vtmcap_visual_input = torch.cat(
                 [visual_features, visual_features], dim=0)
@@ -876,24 +885,24 @@ class CaptioningVTMSparseModel(CaptioningVTMModel):
                          text_encoder)
 
         self.vtm_loss = nn.CrossEntropyLoss()
-    
+
     @torch.no_grad()
     def vtm(self, batch):
         input = batch['image'].reshape(-1, batch['image'].shape[-3],
-                                               batch['image'].shape[-2], batch['image'].shape[-1])
+                                       batch['image'].shape[-2], batch['image'].shape[-1])
         features = self.image_encoder(input)
         bz, num_frame = batch['image'].shape[:2]
 
         corse_features = features[:, 0, :].reshape(
             batch['image'].shape[0], batch['image'].shape[1], -1)
         fine_features = features[[num_frame //
-                                    2 + num_frame * i for i in range(bz)]]
+                                  2 + num_frame * i for i in range(bz)]]
 
         features = torch.cat([corse_features, fine_features], dim=1)
         visual_features = features.reshape(
-                        features.shape[0], -1, 768)
+            features.shape[0], -1, 768)
         cls_prob = self.infer_vtm(
-                visual_features, batch['caption_tokens'], None, batch)
+            visual_features, batch['caption_tokens'], None, batch)
         cls_prob = F.softmax(cls_prob, dim=1)
         return cls_prob[:, 1].view(-1)
 

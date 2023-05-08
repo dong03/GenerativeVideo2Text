@@ -201,11 +201,18 @@ class dcb_images_caps_dataset(Dataset):
                  frm_sampling_strategy="rand", max_img_size=384, video_fmt=''
                  ):
         self.ann = []
+        self.video2id = {}
+        idx = 0
         for ann_file_, video_root_ in zip(ann_file, video_root):
             ann = open(ann_file_).readlines()
             ann = [each.strip().split('\t') for each in ann]
+            for each in ann:
+                video = each[0].split('#')[0]
+                if video not in self.video2id:
+                    self.video2id[video] = idx
+                    idx += 1
             ann = [[os.path.join(video_root_, each[0].split('#')[
-                                 0]), each[1]] for each in ann]
+                                 0]), each[1], self.video2id[each[0].split('#')[0]]] for each in ann]
             self.ann.extend(ann)
             print(f"load {ann_file_} done")
 
@@ -253,7 +260,7 @@ class dcb_images_caps_dataset(Dataset):
     def __getitem__(self, index):
         try:
 
-            video_path, cap = self.ann[index]
+            video_path, cap, video_id = self.ann[index]
             # video_name = video_name.split('#')[0]
             # video_path = os.path.join(self.video_root, video_name)
             video = self._load_video_from_path(video_path)
@@ -263,5 +270,6 @@ class dcb_images_caps_dataset(Dataset):
             video = torch.zeros((self.num_frm, 3, 224, 224))
             video_path = ''
             cap = ''
-        return video, video_path.split('/')[-1], cap
+            video_id = -1
+        return video, video_path.split('/')[-1], cap, video_id
         # import pdb; pdb.set_trace()

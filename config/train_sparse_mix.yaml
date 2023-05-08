@@ -1,6 +1,17 @@
 dataset_name: "BV"
-train_root: ["../VisualSearch/BV_Frame"]
-train_file: ["../data/train_bvcap_captitle.txt"]
+train_root:
+  [
+    "../VisualSearch/BV_Frame",
+    "../VisualSearch/vatex_train_frame",
+    "../VisualSearch/Webvid_Frame",
+  ]
+train_file:
+  [
+    "../data/train_bvcap_captitle.txt",
+    "../data/vatex_train.rawcaption_ch.txt",
+    "../data/webvid_f7.txt",
+  ]
+
 val_root: ["../VisualSearch/BV_Frame"]
 val_file: ["../data/val_bvcap_captitle_pro.txt"]
 
@@ -15,7 +26,7 @@ vtm: False
 dense: False
 sparse: True
 image_res: 224
-batch_size_train: 32
+batch_size_train: 64
 vision_width: 1024
 batch_size_test: 8
 k_test: 128

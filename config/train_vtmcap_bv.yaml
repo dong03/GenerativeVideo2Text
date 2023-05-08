@@ -10,7 +10,7 @@ test_file: '/home/dcb/code/bv/CNXCLIP/dataset/val_bv_pro.txt'
 freeze: 'image'
 read_local_data: True
 
-model_name: 'GIT_BASE_VATEX'
+model_name: 'GIT_BASE'
 vtm: True
 dense: False
 image_res: 224

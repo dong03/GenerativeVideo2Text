@@ -19,7 +19,7 @@ batch_size_train: 32
 vision_width: 1024
 batch_size_test: 8
 k_test: 128
-num_frm_test: 8
+num_frm_test: 16
 
 alpha: 0.4
 warm_up: True

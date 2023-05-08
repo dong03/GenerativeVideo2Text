@@ -56,7 +56,7 @@ def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device,
     warmup_iterations = warmup_steps * step_size
     print("====================================")
 
-    for i, (image, image_name, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for i, (image, image_name, caption, video_id) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # metric_logger.update(loss=1.0)
         # continue
         image = image.to(device, non_blocking=True)
@@ -71,6 +71,7 @@ def train(model, data_loader, optimizer, tokenizer, epoch, warmup_steps, device,
             'image': image,
             'need_predict': caption['attention_mask'],
             'caption_tokens': caption['input_ids'],
+            'idx': video_id
         }
         loss_dict = model(input_data)
         loss = sum([v for v in loss_dict.values()])

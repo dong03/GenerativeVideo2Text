@@ -43,7 +43,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                             max_length=args.max_input_length, return_tensors="pt").to(device)
         if 'prefix' in config:
             prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
-                            max_length=args.max_input_length, return_tensors="pt").to(device)
+                               max_length=args.max_input_length, return_tensors="pt").to(device)
             prefix = prefix['input_ids'][:, :-1]
         from tqdm import tqdm
         for i in tqdm(range(len(image_names))):
@@ -54,7 +54,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
             }
             if 'prefix' in config:
                 input_data['prefix'] = prefix
-            
+
             result = model(input_data)
             cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
         # for i in range(result['predictions'].shape[0]):
@@ -70,6 +70,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 "vtm_score": cls_prob[0, 1].item()})
     return ral_val
 
+
 @torch.no_grad()
 def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
     # test
@@ -84,7 +85,7 @@ def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
     BZ_Text = len(tags)
     video2text = np.zeros((BZ_Video, BZ_Text))
     start_ix = 0
-    for n, (image, image_names, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for n, (image, image_names, _, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # if n == 5:
         #     break
         image = image.to(device, non_blocking=True)
@@ -101,11 +102,11 @@ def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
             }
             result = model.vtm(input_data).cpu().numpy()
             video2text[start_ix:start_ix + image.shape[0], ix] = result.copy()
-            
+
             # for i in range(len(image_names)):
             #     ral_val[image_names[i]].append(result[i].item())
         start_ix += image.shape[0]
-        # if n: 
+        # if n:
         #     import pdb; pdb.set_trace()
     return video2text
 
@@ -122,7 +123,7 @@ def evaluation_mplugdecoder(model, data_loader, tokenizer, device, config):
     ral_val = []
 
     answer_input = None
-    for n, (image, image_names, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for n, (image, image_names, caption, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         if n == 5:
             break
         image = image.to(device, non_blocking=True)
@@ -202,14 +203,15 @@ def main(args, config):
     if os.path.exists(args.vtm_file):
         tags = open(args.vtm_file).readlines()
         tags = [each.strip().split('\t')[-1] for each in tags]
-        video2text = evaluation_vtm(model, test_loader, tokenizer,device, config, tags)
-        
+        video2text = evaluation_vtm(
+            model, test_loader, tokenizer, device, config, tags)
+
         save_file_name = os.path.split(
             args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(args.vtm_file)[-1].split('.')[0] + '.npy'
         np.save(save_file_name, video2text)
         # with open(save_file_name, 'wb') as f:
         #     pickle.dump(result, f)
-            
+
     else:
         result = evaluation(
             model, test_loader, tokenizer, device, config)
@@ -217,8 +219,8 @@ def main(args, config):
         save_file_name = os.path.split(
             args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(config['test_file'][0])[-1].split('.')[0]
         if 'prefix' in config:
-            save_file_name += config['prefix'].replace(' ','-')
-        
+            save_file_name += config['prefix'].replace(' ', '-')
+
         with open(os.path.join(args.output_dir, save_file_name + '.txt'), 'w') as f:
             for res in result:
                 f.write(f"{res['question_id']}\t{res['pred_caption']}\n")

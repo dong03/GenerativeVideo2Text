@@ -54,12 +54,13 @@ def create_dataset(dataset, config, epoch=None):
 
 
 def cap_collate_fn(batch):
-    image_list, image_id_list, caps = [], [], []
-    for image, image_id, cap in batch:
+    image_list, image_id_list, caps, idxs = [], [], [], []
+    for image, image_id, cap, idx in batch:
         image_list.append(image)
         image_id_list.append(image_id)
         caps.append(cap)
-    return torch.stack(image_list, dim=0), image_id_list, caps
+        idxs.append(idx)
+    return torch.stack(image_list, dim=0), image_id_list, caps, torch.tensor(idxs).long()
 
 
 def create_sampler(datasets, shuffles, num_tasks, global_rank):

@@ -10,7 +10,7 @@ test_file: '/home/dcb/code/bv/git_aimc/data/BV_0321_caption.txt'
 freeze: 'image'
 read_local_data: True
 
-model_name: 'GIT_BASE_VATEX'
+model_name: 'GIT_BASE'
 image_res: 224
 batch_size_train: 16
 vision_width: 1024
