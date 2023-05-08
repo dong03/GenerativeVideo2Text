@@ -1,9 +1,9 @@
-pycocotools
-pycocoevalcap
 tqdm
 pyyaml
 torch
-azfuse @ git+https://github.com/microsoft/azfuse.git
 torchvision
 transformers
 boto3
+ruamel.yaml
+albumentations
+decord

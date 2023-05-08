@@ -1,21 +1,9 @@
-dataset_name: "BV"
-train_root: ["../VisualSearch/BV_Frame"]
-train_file: ["../data/train_bvcap_captitle.txt"]
-val_root: ["../VisualSearch/BV_Frame"]
-val_file: ["../data/val_bvcap_captitle_pro.txt"]
-
-test_root: ["../VisualSearch/BV_Frame"]
-test_file: ["../data/BV_0417_caption_cn.txt"]
-
-freeze: "image"
 read_local_data: True
-
 model_name: "GIT_BASE"
 gvt: True
 image_res: 224
 vision_width: 1024
-batch_size_test: 8
+batch_size_test: 32
 k_test: 128
 num_frm_test: 16
-
 use_checkpoint: true
