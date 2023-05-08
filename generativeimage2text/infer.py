@@ -1,52 +1,149 @@
-from torch_common import torch_load, load_state_dict
+from torch_common import load_state_dict
 from model import get_git_model
 from dataset import create_dataset, create_sampler, create_loader, cap_collate_fn
 import utils
-from transformers import ChineseCLIPProcessor, ChineseCLIPModel, AutoTokenizer
-import torch.distributed as dist
+from torchvision import transforms
+from PIL import Image
+from tqdm import tqdm
+from transformers import AutoTokenizer
 import torch.backends.cudnn as cudnn
 import torch
+from decord import VideoReader
 from pathlib import Path
-import json
-import datetime
-import time
 import random
 import numpy as np
-import pickle
 import ruamel.yaml as yaml
 import os
 import argparse
 import matplotlib
-import collections
 from tqdm import tqdm
 matplotlib.use('Agg')
 
 
+def load_images(test_dir, test_transform, config):
+    image_files = os.listdir(test_dir)
+    image_files = sorted(
+        image_files,
+        key=lambda x: int(x.split('_')[-1].split('.')[0]))
+    image_files = [
+        os.path.join(test_dir, each) for each in image_files
+    ]
+    if len(image_files) != config['num_frm_test']:
+        sample_ix = np.linspace(0,
+                                len(image_files) - 1,
+                                num=config['num_frm_test'],
+                                endpoint=True,
+                                retstep=False,
+                                dtype=int)
+        image_files = np.array(image_files)[sample_ix].tolist()
+    images = [Image.open(i).convert('RGB') for i in image_files]
+
+    images = [test_transform(i) for i in images]
+    images = torch.stack(images)
+    return images
+
+
+def load_video(video_path, height=None, width=None, start_time=None, end_time=None, fps=-1, num_frm=16, test_transform=None):
+
+    if not height or not width:
+        vr = VideoReader(video_path)
+    else:
+        vr = VideoReader(video_path, width=width, height=height)
+
+    vlen = len(vr)
+
+    if start_time or end_time:
+        assert fps > 0, 'must provide video fps if specifying start and end time.'
+
+        start_idx = min(int(start_time * fps), vlen)
+        end_idx = min(int(end_time * fps), vlen)
+    else:
+        start_idx, end_idx = 0, vlen
+
+    frame_indices = np.arange(
+        start_idx, end_idx, vlen / num_frm, dtype=int)
+
+    raw_sample_frms = vr.get_batch(frame_indices).numpy()
+    # raw_sample_frms = raw_sample_frms.permute(0, 3, 1, 2).numpy()
+
+    raw_sample_frms = [Image.fromarray(each) for each in raw_sample_frms]
+    images = [test_transform(i) for i in raw_sample_frms]
+    images = torch.stack(images)
+    return images
+
+
 @torch.no_grad()
-def evaluation(model, data_loader, tokenizer, device, config):
+def infer_single(model, tokenizer, device, config):
+    model.eval()
+    test_file = config['test_file']
+    normalize = transforms.Normalize(
+        (0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+
+    test_transform = transforms.Compose([
+        transforms.Resize(
+            (config['image_res'], config['image_res']), interpolation=transforms.InterpolationMode.BICUBIC),
+        transforms.ToTensor(),
+        normalize,
+    ])
+    if os.path.isdir(test_file):
+        images = load_images(test_file, test_transform, config)
+    else:
+        images = load_video(
+            test_file, num_frm=config['num_frm_test'], test_transform=test_transform)
+
+    images = images.to(device, non_blocking=True)
+    images = images.unsqueeze(0)
+    caption = tokenizer([''], padding='longest', truncation=True,
+                        max_length=args.max_input_length, return_tensors="pt").to(device)
+    if 'prefix' in config:
+        prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
+                           max_length=args.max_input_length, return_tensors="pt").to(device)
+        prefix = prefix['input_ids'][:, :-1]
+
+    input_data = {
+        'image': images,
+        'need_predict': caption['attention_mask'],
+        'caption_tokens': caption['input_ids'],
+    }
+    if 'prefix' in config:
+        input_data['prefix'] = prefix
+
+    result = model(input_data)
+    # for i in range(result['predictions'].shape[0]):
+    cap = tokenizer.decode(
+        result['predictions'][0],
+        skip_special_tokens=True)
+    cap = cap.replace(
+        "[CLS]", "").replace("[PAD]", "").strip()
+    print(test_file)
+    print('===============')
+    print(cap)
+
+
+@torch.no_grad()
+def infer_batch(model, data_loader, tokenizer, device, config):
     # test;
     model.eval()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Generate caption test result:'
-    print_freq = 5
+    print_freq = 50
 
     ral_val = []
 
-    answer_input = None
-    for n, (image, image_names, caption) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for n, (image, image_names) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # if n == 5:
         #     break
         image = image.to(device, non_blocking=True)
-
-        caption = tokenizer(caption, padding='longest', truncation=True,
+        caption = ['' for _ in range(image.shape[0])]
+        caption = tokenizer('', padding='longest', truncation=True,
                             max_length=args.max_input_length, return_tensors="pt").to(device)
         if 'prefix' in config:
             prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
                                max_length=args.max_input_length, return_tensors="pt").to(device)
             prefix = prefix['input_ids'][:, :-1]
-        from tqdm import tqdm
-        for i in tqdm(range(len(image_names))):
+
+        for i in range(len(image_names)):
             input_data = {
                 'image': image[i:i+1],
                 'need_predict': caption['attention_mask'][i:i+1],
@@ -56,8 +153,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
                 input_data['prefix'] = prefix
 
             result = model(input_data)
-            cls_prob = result.get('cls_prob', torch.tensor([[0.0, 0.0]]))
-        # for i in range(result['predictions'].shape[0]):
+
             cap = tokenizer.decode(
                 result['predictions'][0],
                 skip_special_tokens=True)
@@ -66,91 +162,7 @@ def evaluation(model, data_loader, tokenizer, device, config):
             ral_val.append({
                 "question_id": image_names[i],
                 "pred_caption": cap,
-                "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
-                "vtm_score": cls_prob[0, 1].item()})
-    return ral_val
-
-
-@torch.no_grad()
-def evaluation_vtm(model, data_loader, tokenizer, device, config, tags):
-    # test
-    model.eval()
-
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Generate video-text matching test result:'
-    print_freq = 5
-
-    ral_val = collections.defaultdict(list)
-    BZ_Video = len(data_loader.dataset)
-    BZ_Text = len(tags)
-    video2text = np.zeros((BZ_Video, BZ_Text))
-    start_ix = 0
-    for n, (image, image_names, _, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        # if n == 5:
-        #     break
-        image = image.to(device, non_blocking=True)
-
-        for ix, tag in enumerate(tqdm(tags)):
-            # caption = f"一个关于{tag}的视频"
-            caption = [tag for _ in range(image.shape[0])]
-            caption = tokenizer(caption, padding='longest', truncation=True,
-                                max_length=args.max_input_length, return_tensors="pt").to(device)
-            input_data = {
-                'image': image,
-                'need_predict': caption['attention_mask'],
-                'caption_tokens': caption['input_ids']
-            }
-            result = model.vtm(input_data).cpu().numpy()
-            video2text[start_ix:start_ix + image.shape[0], ix] = result.copy()
-
-            # for i in range(len(image_names)):
-            #     ral_val[image_names[i]].append(result[i].item())
-        start_ix += image.shape[0]
-        # if n:
-        #     import pdb; pdb.set_trace()
-    return video2text
-
-
-@torch.no_grad()
-def evaluation_mplugdecoder(model, data_loader, tokenizer, device, config):
-    # test
-    model.eval()
-
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Generate caption test result:'
-    print_freq = 5
-
-    ral_val = []
-
-    answer_input = None
-    for n, (image, image_names, caption, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        if n == 5:
-            break
-        image = image.to(device, non_blocking=True)
-
-        caption = tokenizer(caption, padding='longest', truncation=True,
-                            max_length=args.max_input_length, return_tensors="pt").to(device)
-
-        input_data = {
-            'image': image,
-            'need_predict': caption['attention_mask'],
-            'caption_tokens': caption['input_ids'],
-        }
-        result = model(input_data)
-        cls_prob = result.get('cls_prob', torch.zeros((image.shape[0], 2)))
-
-        for i in range(len(result['predictions'])):
-            cap = tokenizer.decode(
-                result['predictions'][i][0],
-                skip_special_tokens=True)
-            cap = cap.replace(
-                "[CLS]", "").replace("[PAD]", "").strip()
-            ral_val.append({
-                "question_id": image_names[i],
-                "pred_caption": cap,
-                "gold_caption": tokenizer.decode(caption['input_ids'][i], skip_special_tokens=True).replace("[SEP]", "").replace("[CLS]", "").replace("[PAD]", "").strip(),
-                "vtm_score": cls_prob[i, 1].item()})
-
+            })
     return ral_val
 
 
@@ -176,19 +188,7 @@ def main(args, config):
 
     #### Dataset ####
     # print("Creating vqa datasets")
-    datasets = create_dataset('dcb_frames_caps', config)
 
-    samplers = [None, None, None]
-    _, _, test_loader = create_loader(datasets, samplers,
-                                      batch_size=[
-                                          config['batch_size_train'], config['batch_size_test'], config['batch_size_test'] * 4],
-                                      num_workers=[32, 8, 32], is_trains=[True, False, False],
-                                      collate_fns=[cap_collate_fn, cap_collate_fn, cap_collate_fn])
-
-    # tokenizer = BertTokenizer.from_pretrained(args.text_encoder)
-    # tokenizer = ChineseCLIPProcessor.from_pretrained(
-    #     "OFA-Sys/chinese-clip-vit-base-patch16")
-    # tokenizer = tokenizer.tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         "uer/gpt2-chinese-cluecorpussmall")
     model = get_git_model(tokenizer, {}, config)
@@ -200,20 +200,16 @@ def main(args, config):
     model.eval()
     model = model.to(device)
     get_parameter_number(model)
-    if os.path.exists(args.vtm_file):
-        tags = open(args.vtm_file).readlines()
-        tags = [each.strip().split('\t')[-1] for each in tags]
-        video2text = evaluation_vtm(
-            model, test_loader, tokenizer, device, config, tags)
+    if '.txt' in config['test_file']:
+        dataset = create_dataset(config=config)
 
-        save_file_name = os.path.split(
-            args.checkpoint)[-1].split('.')[0] + '_' + os.path.split(args.vtm_file)[-1].split('.')[0] + '.npy'
-        np.save(save_file_name, video2text)
-        # with open(save_file_name, 'wb') as f:
-        #     pickle.dump(result, f)
+        sampler = None
+        test_loader = create_loader(dataset, sampler,
+                                    batch_size=config['batch_size_test'],
+                                    n_worker=32,
+                                    collate_fn=cap_collate_fn)
 
-    else:
-        result = evaluation(
+        result = infer_batch(
             model, test_loader, tokenizer, device, config)
         # import pdb; pdb.set_trace()
         save_file_name = os.path.split(
@@ -224,7 +220,8 @@ def main(args, config):
         with open(os.path.join(args.output_dir, save_file_name + '.txt'), 'w') as f:
             for res in result:
                 f.write(f"{res['question_id']}\t{res['pred_caption']}\n")
-
+    else:
+        infer_single(model, tokenizer, device, config)
     # result_file = save_result(vqa_result, args.result_dir, 'vqa_result_epoch10')
     # if utils.is_main_process():
     #     result = cal_metric(result_file)
@@ -256,7 +253,10 @@ if __name__ == '__main__':
     parser.add_argument('--no_init_decocde', action='store_true')
     parser.add_argument('--do_accum', action='store_true')
     parser.add_argument('--accum_steps', default=4, type=int)
-    parser.add_argument('--vtm_file', default='')
+    parser.add_argument('--to_be_infered', default='', type=str)
+    parser.add_argument('--git', action='store_true')
+    parser.add_argument('--use_video', action='store_true')
+
     args = parser.parse_args()
 
     config = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
@@ -265,14 +265,19 @@ if __name__ == '__main__':
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     Path(args.result_dir).mkdir(parents=True, exist_ok=True)
+    config['test_file'] = args.to_be_infered
     config["min_length"] = args.min_length
+
     config["max_length"] = args.max_length
     config["add_object"] = args.add_object
     config["beam_size"] = args.beam_size
-    #config['optimizer']['lr'] = args.lr
-    #config['schedular']['lr'] = args.lr
     config['text_encoder'] = args.text_encoder
     config['text_decoder'] = args.text_decoder
+    config['use_video'] = False
+    if args.git:
+        config['gvt'] = False
+    if args.use_video:
+        config['use_video'] = True
 
     yaml.dump(config, open(os.path.join(args.output_dir, 'config.yaml'), 'w'))
 
