@@ -1,5 +1,5 @@
 # GVT
-- 模型结构改动：```generativeimage2text/layers/dcb_decoder.py```
+- 模型结构改动：```generativeimage2text/layers/gvt_decoder.py```
 - 数据集改动：```generativeimage2text/dataset/video_dataset_dcb.py```
 - 训练代码：```generativeimage2text/train_like_mplug.py```
 - 推理代码：```generativeimage2text/infer_like_mplug.py```

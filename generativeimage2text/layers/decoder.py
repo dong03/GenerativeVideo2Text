@@ -174,7 +174,7 @@ class BertEncoderAsDecoder(nn.Module):
                 encoder_history_states=encoder_history_states,
             )
             result = list(result)
-            cls_pos = result[0][:, num_memory]
+            cls_pos = result[0][:, -1]
             result[0] = result[0][:, num_memory:].transpose(0, 1)
             if self.encoder.output_hidden_states:
                 return result[0], result[1]

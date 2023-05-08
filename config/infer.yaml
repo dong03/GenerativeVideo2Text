@@ -11,29 +11,11 @@ freeze: "image"
 read_local_data: True
 
 model_name: "GIT_BASE"
-vtm: False
-dense: False
-sparse: True
+gvt: True
 image_res: 224
-batch_size_train: 32
 vision_width: 1024
 batch_size_test: 8
 k_test: 128
 num_frm_test: 16
 
-alpha: 0.4
-warm_up: True
-
-optimizer: { opt: adamW, lr1: 1.0e-4, lr2: 5.0e-5, weight_decay: 0.02 }
-schedular:
-  {
-    sched: cosine,
-    lr: 5.0e-5,
-    epochs: 16,
-    min_lr: 1.0e-6,
-    decay_rate: 1,
-    warmup_lr: 1.0e-5,
-    warmup_epochs: 2,
-    cooldown_epochs: 0,
-  }
 use_checkpoint: true
