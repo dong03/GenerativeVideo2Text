@@ -1,12 +1,13 @@
-# GVT
+# GVT: Generative Video-to-text Transformer 
+![Image text](./gvt.png)
 ## Prepare
-- install
-  ```bash
-  pip install -r requirements
-  ```
-- data
-  - 一行一个视频全路径的txt文件
-  - or 一个视频路径/视频帧文件夹
+- install [azfuse](https://github.com/microsoft/azfuse)
+- pip install -r requirements
+- prepare input data:
+  - One txt file, each line is an absolute directory of a video's frames.
+  - Or just an absolute path of a video file.
+## Demo
+[demo.ipynb](demo.ipynb)
 ## Inference
 - inference on single video
   ```bash
