@@ -94,10 +94,10 @@ def infer_single(model, tokenizer, device, config):
     images = images.to(device, non_blocking=True)
     images = images.unsqueeze(0)
     caption = tokenizer([''], padding='longest', truncation=True,
-                        max_length=args.max_input_length, return_tensors="pt").to(device)
+                        max_length=config['max_input_length'], return_tensors="pt").to(device)
     if 'prefix' in config:
         prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
-                           max_length=args.max_input_length, return_tensors="pt").to(device)
+                           max_length=config['max_input_length'], return_tensors="pt").to(device)
         prefix = prefix['input_ids'][:, :-1]
 
     input_data = {
@@ -118,6 +118,7 @@ def infer_single(model, tokenizer, device, config):
     print(test_file)
     print('===============')
     print(cap)
+    return cap
 
 
 @torch.no_grad()
@@ -137,10 +138,11 @@ def infer_batch(model, data_loader, tokenizer, device, config):
         image = image.to(device, non_blocking=True)
         caption = ['' for _ in range(image.shape[0])]
         caption = tokenizer('', padding='longest', truncation=True,
-                            max_length=args.max_input_length, return_tensors="pt").to(device)
+                            max_length=
+                            config['max_input_length'], return_tensors="pt").to(device)
         if 'prefix' in config:
             prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
-                               max_length=args.max_input_length, return_tensors="pt").to(device)
+                               max_length=config['max_input_length'], return_tensors="pt").to(device)
             prefix = prefix['input_ids'][:, :-1]
 
         for i in range(len(image_names)):
@@ -266,8 +268,8 @@ if __name__ == '__main__':
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     Path(args.result_dir).mkdir(parents=True, exist_ok=True)
     config['test_file'] = args.to_be_infered
+    config['max_input_length'] = args.max_input_length
     config["min_length"] = args.min_length
-
     config["max_length"] = args.max_length
     config["add_object"] = args.add_object
     config["beam_size"] = args.beam_size

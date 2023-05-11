@@ -6,4 +6,5 @@ vision_width: 1024
 batch_size_test: 32
 k_test: 128
 num_frm_test: 16
+max_input_length: 25
 use_checkpoint: true

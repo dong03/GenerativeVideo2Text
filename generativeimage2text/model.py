@@ -32,8 +32,8 @@ def get_git_model(tokenizer, param, yaml_param=None):
         CAP_MODEL = CaptioningModel
         TEXT_ENCODER = None
         
-    print(f"========{TEXT_DECODER}=======")
-    print(f"========{CAP_MODEL}=======")
+    # print(f"========{TEXT_DECODER}=======")
+    # print(f"========{CAP_MODEL}=======")
     text_decoder = TEXT_DECODER(
         visual_feature_size=param.get('visual_feature_size', 768),
         vocab_size=tokenizer.vocab_size,
