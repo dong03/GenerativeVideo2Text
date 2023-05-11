@@ -6,6 +6,8 @@
 - prepare input data:
   - One txt file, each line is an absolute directory of a video's frames.
   - Or just an absolute path of a video file.
+- download checkpoint from [Google Drive](https://drive.google.com/file/d/1UxyFdnldFIDIkprc6ziNEK5cgo6yEbDs/view?usp=share_link) and place it in current directory.
+
 ## Demo
 [demo.ipynb](demo.ipynb)
 ## Inference
