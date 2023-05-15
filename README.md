@@ -23,7 +23,7 @@
   TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python infer.py \
       --config ../config/infer.yaml \
       --output_dir ../ckpt/results/ \
-      --checkpoint ../GVT_ft_ChinaOpen.pth \
+      --checkpoint ../GVT_ChinaOpen.pth \
       --min_length 15 \
       --beam_size 10 \
       --max_length 32 \
@@ -39,7 +39,7 @@
     TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python infer.py \
         --config ../config/infer.yaml \
         --output_dir ../ckpt/results/ \
-        --checkpoint ../GVT_ft_ChinaOpen.pth \
+        --checkpoint ../GVT_ChinaOpen.pth \
         --min_length 15 \
         --beam_size 10 \
         --max_length 32 \
@@ -52,7 +52,7 @@
   TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python infer.py \
       --config ../config/infer.yaml \
       --output_dir ../demo/results/ \
-      --checkpoint ../GVT_ft_ChinaOpen.pth \
+      --checkpoint ../GVT_ChinaOpen.pth \
       --min_length 15 \
       --beam_size 10 \
       --max_length 32 \
