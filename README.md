@@ -1,13 +1,21 @@
 # GVT: Generative Video-to-text Transformer 
 ![Image text](./gvt.png)
 ## Prepare
-- install [azfuse](https://github.com/microsoft/azfuse)
-- pip install -r requirements
+- install requirements:
+  ```bash
+  pip install git+https://github.com/microsoft/azfuse.git
+  pip install -r requirements
+  ```
 - prepare input data:
   - One txt file, each line is an absolute directory of a video's frames.
   - Or just an absolute path of a video file.
+- download examples and checkpoint:
+  ```
+  bash down.sh
+  ```
 ## Demo
-[demo.ipynb](demo.ipynb)
+[Jupyter notebooks](demo.ipynb) / [Google Colab](https://colab.research.google.com/gist/dong03/2fffdbaeb3d0fcae220fd2522cfd3ef6/inference_gvt.ipynb)
+
 ## Inference
 - inference on single video
   ```bash
@@ -20,7 +28,7 @@
       --beam_size 10 \
       --max_length 32 \
       --max_input_length 48 \
-      --to_be_infered ../VisualSearch/BV_Video/BV1CN411o7WE.mp4\
+      --to_be_infered ../demo/videos/BV1CN411o7WE.mp4 \
       --use_video
   
   ```
@@ -36,7 +44,7 @@
         --beam_size 10 \
         --max_length 32 \
         --max_input_length 48 \
-        --to_be_infered ../demo/BV1CN411o7WE
+        --to_be_infered ../demo/frames/BV1CN411o7WE
   ```
 - inference on batch
   ```bash

@@ -195,7 +195,7 @@ def main(args, config):
         "uer/gpt2-chinese-cluecorpussmall")
     model = get_git_model(tokenizer, {}, config)
 
-    checkpoint = torch.load(args.checkpoint, map_location='cpu')['model']
+    checkpoint = torch.load(args.checkpoint, map_location='cpu')
     # model.load_state_dict(checkpoint)
     load_state_dict(model, checkpoint)
 
