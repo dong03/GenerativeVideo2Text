@@ -4,7 +4,6 @@ from dataset import create_dataset, create_sampler, create_loader, cap_collate_f
 import utils
 from torchvision import transforms
 from PIL import Image
-from tqdm import tqdm
 from transformers import AutoTokenizer
 import torch.backends.cudnn as cudnn
 import torch
@@ -16,7 +15,6 @@ import ruamel.yaml as yaml
 import os
 import argparse
 import matplotlib
-from tqdm import tqdm
 matplotlib.use('Agg')
 
 
@@ -138,8 +136,7 @@ def infer_batch(model, data_loader, tokenizer, device, config):
         image = image.to(device, non_blocking=True)
         caption = ['' for _ in range(image.shape[0])]
         caption = tokenizer('', padding='longest', truncation=True,
-                            max_length=
-                            config['max_input_length'], return_tensors="pt").to(device)
+                            max_length=config['max_input_length'], return_tensors="pt").to(device)
         if 'prefix' in config:
             prefix = tokenizer(config['prefix'], padding='longest', truncation=True,
                                max_length=config['max_input_length'], return_tensors="pt").to(device)
@@ -187,9 +184,6 @@ def main(args, config):
     np.random.seed(seed)
     random.seed(seed)
     cudnn.benchmark = True
-
-    #### Dataset ####
-    # print("Creating vqa datasets")
 
     tokenizer = AutoTokenizer.from_pretrained(
         "uer/gpt2-chinese-cluecorpussmall")
