@@ -1,5 +1,5 @@
 # GVT: Generative Video-to-text Transformer 
-![Image text](./gvt.png)
+![Image text](./gvt.jpeg#pic_center)
 ## Prepare
 - install requirements:
   ```bash
