@@ -25,7 +25,7 @@
 ## Inference
 see ./generativeimage2text/infer.sh 
 - inference on single video
-  ```bash
+  ```
   # single video
   cd generativeimage2text
   TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=<GPU_id> python infer.py \
