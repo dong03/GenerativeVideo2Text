@@ -1,9 +1,8 @@
 tqdm
 pyyaml
-torch
-torchvision
 transformers
 boto3
 ruamel.yaml
 albumentations
 decord
+matplotlib

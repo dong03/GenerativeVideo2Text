@@ -7,7 +7,8 @@
   pip install -r requirements.txt
   ```
   Install PyTorch and torchvision following the [official instructions](https://pytorch.org/), e.g., 
-  ```conda install pytorch torchvision -c pytorch
+  ```bash
+  conda install pytorch torchvision -c pytorch
   ```
 
 
