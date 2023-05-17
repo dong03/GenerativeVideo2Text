@@ -66,6 +66,7 @@ see ./generativeimage2text/infer.sh
       --beam_size 10 \
       --max_length 32 \
       --max_input_length 48 \
+      --test_root ../demo/frames \
       --to_be_infered ../demo/demo.txt
   ```
 - run infer.sh

@@ -30,4 +30,5 @@ TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=$1 python infer.py \
     --beam_size 10 \
     --max_length 32 \
     --max_input_length 48 \
+    --test_root ../demo/frames \
     --to_be_infered ../demo/demo.txt

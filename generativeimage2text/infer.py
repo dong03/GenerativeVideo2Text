@@ -195,7 +195,7 @@ def main(args, config):
 
     model.eval()
     model = model.to(device)
-    get_parameter_number(model)
+    #get_parameter_number(model)
     if '.txt' in config['test_file']:
         dataset = create_dataset(config=config)
 
@@ -252,6 +252,7 @@ if __name__ == '__main__':
     parser.add_argument('--to_be_infered', default='', type=str)
     parser.add_argument('--git', action='store_true')
     parser.add_argument('--use_video', action='store_true')
+    parser.add_argument('--test_root', default="../demo/frames",type=str)
 
     args = parser.parse_args()
 
@@ -269,6 +270,7 @@ if __name__ == '__main__':
     config["beam_size"] = args.beam_size
     config['text_encoder'] = args.text_encoder
     config['text_decoder'] = args.text_decoder
+    config['test_root'] = args.test_root
     config['use_video'] = False
     if args.git:
         config['gvt'] = False
