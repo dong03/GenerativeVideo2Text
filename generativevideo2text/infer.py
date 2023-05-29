@@ -225,9 +225,9 @@ def main(args, config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='./configs/VQA.yaml')
+    parser.add_argument('--config', default='./configs/infer.yaml')
     parser.add_argument('--checkpoint', default='')
-    parser.add_argument('--output_dir', default='output/vqa')
+    parser.add_argument('--output_dir', default='output')
     parser.add_argument('--evaluate', action='store_true')
     parser.add_argument('--text_encoder', default='bert-base-uncased')
     parser.add_argument('--text_decoder', default='bert-base-uncased')
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     parser.add_argument('--to_be_infered', default='', type=str)
     parser.add_argument('--git', action='store_true')
     parser.add_argument('--use_video', action='store_true')
-    parser.add_argument('--test_root', default="../demo/frames",type=str)
+    parser.add_argument('--test_root', default="../demo/frames", type=str)
 
     args = parser.parse_args()
 

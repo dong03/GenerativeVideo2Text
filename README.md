@@ -23,11 +23,11 @@
 [Jupyter notebooks](demo.ipynb) / [Google Colab](https://colab.research.google.com/gist/dong03/2fffdbaeb3d0fcae220fd2522cfd3ef6/inference_gvt.ipynb)
 
 ## Inference
-see ./generativeimage2text/infer.sh 
+see ./generativevideo2text/infer.sh 
 - inference on single video
   ```
   # single video
-  cd generativeimage2text
+  cd generativevideo2text
   TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=<GPU_id> python infer.py \
       --config ../config/infer.yaml \
       --output_dir ../ckpt/results/ \
@@ -43,7 +43,7 @@ see ./generativeimage2text/infer.sh
 - inference on single frames dir
   ```bash
   # single images dir
-    cd generativeimage2text
+    cd generativevideo2text
     TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=<GPU_id> python infer.py \
         --config ../config/infer.yaml \
         --output_dir ../ckpt/results/ \
@@ -57,7 +57,7 @@ see ./generativeimage2text/infer.sh
 - inference on batch
   ```bash
   # batch
-  cd generativeimage2text
+  cd generativevideo2text
   TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=<GPU_id> python infer.py \
       --config ../config/infer.yaml \
       --output_dir ../demo/results/ \
@@ -71,7 +71,7 @@ see ./generativeimage2text/infer.sh
   ```
 - run infer.sh
   ```bash
-  cd generativeimage2text
+  cd generativevideo2text
   bash infer.sh <GPU_id>
   ```
 

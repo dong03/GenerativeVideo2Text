@@ -23,9 +23,9 @@ jobs:
               run: python -m build
             - name: Verify files in build
               run: |
-                for f in generativeimage2text/* generativeimage2text/**/*;
+                for f in generativevideo2text/* generativevideo2text/**/*;
                 do
-                    tar -tzvf dist/generativeimage2text*.tar.gz | grep -q $f
+                    tar -tzvf dist/generativevideo2text*.tar.gz | grep -q $f
                     if [ $? -eq 1 ]; then
                         exit 1
                     fi
@@ -45,4 +45,4 @@ jobs:
             - name: Install locally
               run: pip install -e .
             - name: Test execution
-              run: python -c "from generativeimage2text.inference import test_git_inference_single_image"
+              run: python -c "from generativevideo2text.inference import test_git_inference_single_image"
