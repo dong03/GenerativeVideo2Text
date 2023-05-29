@@ -20,7 +20,7 @@
   bash down.sh
   ```
 ## Demo
-[Jupyter notebooks](demo.ipynb) / [Google Colab](https://colab.research.google.com/gist/dong03/2fffdbaeb3d0fcae220fd2522cfd3ef6/inference_gvt.ipynb)
+[Google Colab](https://colab.research.google.com/gist/dong03/59b5c31779b5524e58db479ae15fb376/inference_gvt.ipynb) / [Jupyter notebooks]
 
 ## Inference
 see ./generativevideo2text/infer.sh 
